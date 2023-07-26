@@ -62,10 +62,7 @@ int chartnummer = 0;
     setState(() {
       showcountvalue = true;
     });
-
   }
-
-
 
   @override
   void initState() {
@@ -75,8 +72,8 @@ int chartnummer = 0;
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
-
   }
+
   Future<void> _initializeCamera() async {
     cameras.addAll(await availableCameras());
     // You can now access the cameras list and initialize your camera controller
@@ -192,7 +189,6 @@ int chartnummer = 0;
                     child: TextButton(// You can use other alignments like Alignment.topLeft, Alignment.bottomRight, etc.
                       onPressed: () {
                         showcount(1);
-
                         updateGlobalInfo('sensor 2');
                         chartinfo(4);
                       },
@@ -213,9 +209,8 @@ int chartnummer = 0;
     );
   }
 
+
   Widget _buildPreview(String numberOfEquipment, int chartnumber) {
-
-
     return StreamBuilder<_ScannedFrame>(
       stream: _scannedFrameStreamController.stream,
       initialData: null,
@@ -232,6 +227,7 @@ int chartnummer = 0;
       ),
     );
   }
+
 
   Widget _buildFrame(_ScannedFrame frame, double width, double height,numberOfEquipment, chartnumber) {
     final scaleFactor = width / frame.image.width.toDouble();
