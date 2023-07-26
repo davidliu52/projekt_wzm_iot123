@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:projekt_wzm_iot/pages/auth_page.dart';
-import 'package:projekt_wzm_iot/pages/dashboard_page.dart';
 import 'package:projekt_wzm_iot/pages/dashboard_page_M1.dart';
 import 'package:projekt_wzm_iot/pages/dashboard_page_M2.dart';
 import 'package:projekt_wzm_iot/pages/dashboard_page_S1.dart';
@@ -9,6 +8,7 @@ import 'package:projekt_wzm_iot/pages/faq_page.dart';
 import 'package:projekt_wzm_iot/pages/main_page.dart';
 import 'package:projekt_wzm_iot/pages/pwreset_page.dart';
 import 'package:projekt_wzm_iot/pages/setting_page.dart';
+import 'package:projekt_wzm_iot/pages/AR-Dashboard_page.dart';
 
 class PageNotifier extends ChangeNotifier{
   String _currentPage = MainPage.pageName;
@@ -60,8 +60,8 @@ class PageNotifier extends ChangeNotifier{
     notifyListeners();
   }
 
-  void goToOtherPage(String name){
-    _currentPage = name;
+  void goToAR(){
+    _currentPage =ARcode.pageName;
     notifyListeners();
   }
 }

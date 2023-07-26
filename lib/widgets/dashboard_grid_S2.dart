@@ -1,466 +1,292 @@
+import 'dart:convert';
+import 'dart:io';
 import 'package:flutter/material.dart';
+import 'package:intl/intl.dart';
 import 'package:projekt_wzm_iot/pages/dashboard_page_S2.dart';
-import 'package:projekt_wzm_iot/pages/main_page.dart';
-import 'package:flutter/src/material/colors.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:thingsboard_client/thingsboard_client.dart';
+import 'package:mqtt_client/mqtt_client.dart';
+import 'package:projekt_wzm_iot/mqtt_server_client.dart' if (dart.library.html) 'package:projekt_wzm_iot/mqtt_browser_client.dart' as mqttsetup;
 
+
+//DashboardS2Grid is an independent class, solely for displaying the chart.
 
 class DashboardS2Grid extends StatefulWidget {
+  const DashboardS2Grid({super.key});
 
   @override
   State<DashboardS2Grid> createState() => _DashboardS2GridState();
 }
 
 class _DashboardS2GridState extends State<DashboardS2Grid> {
-
   late List<LiveData> chartData;
   late ChartSeriesController _chartSeriesController;
+  Map<String, dynamic> pt = {};
+  Timer? _updateTimer;
+  Timer? _dataReadTimer;
+  final client = mqttsetup.setup('broker.emqx.io', 'uniqueID', 1883);
+
+  //----- This function will initialize the function. It is called only once------
 
   @override
   void initState() {
-    chartData = getChartData();
-    Timer.periodic(const Duration(seconds: 3), updateDataSource);
+    chartData = getChartData();// Prepare the data for the time series chart.
+    _updateTimer=Timer.periodic(const Duration(seconds: 1), updateDataSource);
+    //  This line is initializing a periodic timer that triggers every second. When the timer triggers, it calls the updateDataSource() function.
     super.initState();
+    connectAndSubscribe1();// This is a custom function that be used to connect MQTT broker.
   }
 
-  var tbClient = ThingsboardClient(thingsBoardApiEndpoint);
+  //---------initialize the parameter-----------
+
   double _x = 0;
   double _y = 0;
   double _z = 0;
-  double _time = 0;
+ // double _time = 0;
+  bool _is_connecting = false;
   String _currentPage = DashboardS2Page.pageName;
-
   String get currentPage => _currentPage;
 
-
-  Timer? _timer;
-
   _DashboardS2GridState() {
-    login();
-
-
     if (_currentPage == DashboardS2Page.pageName) {
-      _timer = Timer.periodic(const Duration(milliseconds: 3000), (_timer) {
+      _dataReadTimer = Timer.periodic(const Duration(milliseconds: 1000), (_timer) {
         dateneinlesen();
       });
     }
   }
 
+//dispose method used to release the memory allocated to variables when state object is removed.
+//If you turn off this page, the MQTT broker will be disconnected.The same for updateTimer and _dataReadTimer
 
-  // Thingsboard login
-  void login() async {
-    try {
-      await tbClient.login(LoginRequest(ID, PW));
-      print('isAuthenticated=${tbClient.isAuthenticated()}');
-    } catch (e, s) {
-      print('Error: $e');
-      print('Stack: $s');
-    }
+  @override
+  void dispose() {
+    print("Connection status before disconnect: ${client.connectionStatus}");
+    client.disconnect();
+    print("Connection status after disconnect: ${client.connectionStatus}");
+    _updateTimer?.cancel(); // Cancel the timers
+    _dataReadTimer?.cancel();
+    super.dispose();
   }
 
-  void dateneinlesen() async {
+//-----------MQTT_connection----begin----------------
+
+  Future<void> connectAndSubscribe1() async {
+    client.websocketProtocols = MqttClientConstants.protocolsSingleDefault;
+    client.logging(on: true);
+    client.keepAlivePeriod = 60;
+    client.onConnected = onConnected;
+    client.onSubscribed = onSubscribed;
+    client.pongCallback = pong;
+
+    final connMess = MqttConnectMessage()
+        .withClientIdentifier('clientId-x1TCmasbCY')
+        .withWillTopic('willtopic')
+        .withWillMessage('My Will message')
+        .startClean()
+        .withWillQos(MqttQos.atLeastOnce);
+    print('Client connecting....');
+    client.connectionMessage = connMess;
+
     try {
-      // SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
-      // final accessToken = sharedPreferences.getString('access_token');
-      // final tbClient = ThingsboardClient(thingsBoardApiEndpoint);
-
-
-      if (tbClient.isAuthenticated() == true) {
-        var deviceName = 'Sensor 1';
-        var pageLink = PageLink(10);
-        PageData<DeviceInfo> devices;
-        devices =
-        await tbClient.getDeviceService().getTenantDeviceInfos(pageLink);
-        //Link mit Token eingeben
-        // print('devices: $devices');
-
-        var device = Device(deviceName, 'default');
-
-        var entityFilter = EntityNameFilter(
-            entityType: EntityType.DEVICE, entityNameFilter: deviceName);
-
-        var deviceFields = <EntityKey>[
-          EntityKey(type: EntityKeyType.ENTITY_FIELD, key: 'name'),
-          EntityKey(type: EntityKeyType.ENTITY_FIELD, key: 'type'),
-          EntityKey(type: EntityKeyType.ENTITY_FIELD, key: 'createdTime'),
-        ];
-
-        // !!!!!!!!!!!!!!timeseries start!!!!!!!!!!!!!!!!
-        var deviceTelemetry = <EntityKey>[
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'x'),
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'y'),
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'z'),
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'time'),
-        ];
-
-        var devicesQuery = EntityDataQuery(
-            entityFilter: entityFilter,
-            entityFields: deviceFields,
-            latestValues: deviceTelemetry,
-            pageLink: EntityDataPageLink(
-                pageSize: 10,
-                sortOrder: EntityDataSortOrder(
-                    key: EntityKey(
-                        type: EntityKeyType.ENTITY_FIELD, key: 'createdTime'),
-                    direction: EntityDataSortOrderDirection.DESC)));
-
-
-        var currentTime = DateTime
-            .now()
-            .millisecondsSinceEpoch;
-        var timeWindow = Duration(hours: 1).inMilliseconds;
-
-        var tsCmd = TimeSeriesCmd(
-            keys: ([
-              'x',
-              'y',
-              'z',
-              'time'
-            ]),
-            startTs: currentTime - timeWindow,
-            timeWindow: timeWindow);
-
-        var cmd = EntityDataCmd(query: devicesQuery, tsCmd: tsCmd);
-
-        var telemetryService = tbClient.getTelemetryService();
-
-        var subscription = TelemetrySubscriber(telemetryService, [cmd]);
-
-        subscription.entityDataStream.listen((entityDataUpdate) {
-          var whole_data = entityDataUpdate.toString();
-
-
-          print(whole_data);
-
-          int len_wd = whole_data.length;
-
-          // x ANFANG--------------------------------------------------------
-          int Anfang_x = 0;
-          for (var i = 0; i < len_wd - 2; i++) {
-            if (whole_data.substring(i, i + 2) == 'x:') {
-              break;
-            }
-            Anfang_x++;
-          }
-
-          int Ende_x = Anfang_x;
-
-          for (var i = Anfang_x; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_x++;
-          }
-
-          for (var i = Anfang_x; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_x++;
-          }
-
-          _x =
-              double.parse(whole_data.substring(Anfang_x, Ende_x));
-
-          // x ENDE--------------------------------------------------------
-
-          // y ANFANG--------------------------------------------------------
-          int Anfang_y = 0;
-          for (var i = 0; i < len_wd - 2; i++) {
-            if (whole_data.substring(i, i + 2) == 'y:') {
-              break;
-            }
-            Anfang_y++;
-          }
-
-          int Ende_y = Anfang_y;
-
-          for (var i = Anfang_y; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_y++;
-          }
-
-          for (var i = Anfang_y; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_y++;
-          }
-
-          _y =
-              double.parse(whole_data.substring(Anfang_y, Ende_y));
-
-          // y ENDE--------------------------------------------------------
-
-          // z ANFANG--------------------------------------------------------
-          int Anfang_z = 0;
-          for (var i = 0; i < len_wd - 2; i++) {
-            if (whole_data.substring(i, i + 2) == 'z:') {
-              break;
-            }
-            Anfang_z++;
-          }
-
-          int Ende_z = Anfang_z;
-
-          for (var i = Anfang_z; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_z++;
-          }
-
-          for (var i = Anfang_z; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_z++;
-          }
-
-          _z =
-              double.parse(whole_data.substring(Anfang_z, Ende_z));
-
-          // z ENDE--------------------------------------------------------
-
-          // time ANFANG--------------------------------------------------------
-          int Anfang_t = 0;
-          for (var i = 0; i < len_wd - 4; i++) {
-            if (whole_data.substring(i, i + 4) == 'time') {
-              break;
-            }
-            Anfang_t++;
-          }
-
-          int Ende_t = Anfang_t;
-
-          for (var i = Anfang_t; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_t++;
-          }
-
-          for (var i = Anfang_t; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_t++;
-          }
-
-          _time = double.parse(whole_data.substring(Anfang_t, Ende_t));
-          // time ENDE--------------------------------------------------------
-
-
-          setState(() {
-            _x;
-            _y;
-            _z;
-            _time;
-          });
-        });
-
-
-        subscription.subscribe();
-
-        await Future.delayed(Duration(seconds: 3));
-        // !!!!!!!!!!!!!!!!!!!!!!!!!timeseries end!!!!!!!!!!!!!!!!!!!!!!
-      }
-    } catch (e, s) {
-      print('Error: $e');
-      print('Stack: $s');
+      await client.connect();
+    } on NoConnectionException catch (e) {
+      print('Client exception: $e');
+      client.disconnect();
+    } on SocketException catch (e) {
+      print('Socket exception: $e');
+      client.disconnect();
     }
+
+    if (client.connectionStatus!.state == MqttConnectionState.connected) {
+      _is_connecting = true;
+      print('Client connected');
+    } else {
+      print('Client connection failed - disconnecting, status is ${client.connectionStatus}');
+      client.disconnect();
+      return;
+    }
+
+    //---------subscribe the topic ----------------
+
+    const subTopic = 'sensor2/data';
+    print('Subscribing to the $subTopic topic');
+    client.subscribe(subTopic, MqttQos.atLeastOnce);
+    client.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
+      final recMess = c![0].payload as MqttPublishMessage;
+      final ptValue = MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
+        pt = json.decode(ptValue);
+    });
+
+    //---------Publish the data into the topic---------------
+
+    const publishTopic = 'sensor2/data'; // You can change this to the topic you want to publish to.
+    final builder = MqttClientPayloadBuilder();
+    builder.addString(json.encode({
+      "serialNumber": "SN-01",
+      "sensorType": "Accelerometer",
+      "sensorModel": "LIS3DH",
+      "x": 30,
+      "y": 10,
+      "z": 25,
+      "time":0.1
+    }));
+
+    print('Publishing message to $publishTopic');
+    client.publishMessage(publishTopic, MqttQos.atLeastOnce, builder.payload!);
+  }
+
+  void onConnected() {
+    print('Connected to MQTT server');
+  }
+
+  void onSubscribed(String topic) {
+    print('Subscribed to topic: $topic');
+  }
+
+  void pong() {
+    print('Ping response client callback invoked');
+  }
+
+  //----------------MQTT_connection---end
+
+//--------read the specific values from the pt dataset(MQTT broker)----------
+
+  void dateneinlesen()  {
+    if (!mounted) return; // Check if widget is still mounted
+
+    setState(() {
+      _x=double.parse(pt['x'].toString());
+      _y=double.parse(pt['y'].toString());
+      _z=double.parse(pt['z'].toString());
+      _is_connecting = this._is_connecting;
+    });
   }
 
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-
-      //height: MediaQuery.of(context).size.height * 0.5,
-        height: 1000,
-
-        child: Column(
-            children: [
-              Flexible(
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.all(8.0),
-                        padding: const EdgeInsets.all(10.0),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10.0),
-                        ),
-                        child:
-                        SfCartesianChart(
-                          series: <LineSeries<LiveData, num>>[
-                            LineSeries<LiveData, num>(
-                              onRendererCreated: (
-                                  ChartSeriesController controller) {
-                                _chartSeriesController = controller;
-                              },
-                              dataSource: chartData,
-                              color: Colors.red,
-                              xValueMapper: (LiveData sales, _) => sales.t,
-                              yValueMapper: (LiveData sales, _) => sales.x,
 
 
-                            )
-                          ],
-                          primaryXAxis: NumericAxis(
-                              majorGridLines: const MajorGridLines(
-                                  width: 0, color: Colors.black),
-                              edgeLabelPlacement: EdgeLabelPlacement.shift,
-                              interval: 1,
-                              title: AxisTitle(text: 'Zeit [s]')
-                          ),
-                          primaryYAxis: NumericAxis(
-                              axisLine: const AxisLine(
-                                  width: 1, color: Colors.black),
-                              majorTickLines: const MajorTickLines(size: 0),
-                              title: AxisTitle(text: 'x [g]')
-                          ),
-
-                          backgroundColor: Colors.transparent,
-
-                        ),
+    //-------------------------Widget chart end ---------
 
 
-                      ),
+
+    return Column(
+        children: [
+          Container(
+            height:80,
+            color: const Color.fromRGBO(23, 156, 125, 0.5),
+            padding: const EdgeInsets.all(5.0),
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    decoration: BoxDecoration( borderRadius: BorderRadius.circular(50.0)),
+                    alignment: Alignment.center, // You can use other alignments like Alignment.topLeft, Alignment.bottomRight, etc.
+                    child: const Text(' Connection to MQTT',
+                        style:TextStyle(
+                          color: Colors.black,
+                          fontSize: 15.0,
+                          fontWeight: FontWeight.w600 ,)
                     ),
-
-                  ],
+                  ),
                 ),
-              ),
-
-
-              Flexible(
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.all(8.0),
-                        padding: const EdgeInsets.all(10.0),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10.0),
-                        ),
-                        child:
-                        SfCartesianChart(
-                          series: <LineSeries<LiveData, num>>[
-                            LineSeries<LiveData, num>(
-                              onRendererCreated: (
-                                  ChartSeriesController controller) {
-                                _chartSeriesController = controller;
-                              },
-                              dataSource: chartData,
-                              color: Colors.green,
-                              xValueMapper: (LiveData sales, _) => sales.t,
-                              yValueMapper: (LiveData sales, _) => sales.y,
-
-
-                            )
-                          ],
-                          primaryXAxis: NumericAxis(
-                              majorGridLines: const MajorGridLines(
-                                  width: 0, color: Colors.black),
-                              edgeLabelPlacement: EdgeLabelPlacement.shift,
-                              interval: 1,
-                              title: AxisTitle(text: 'Zeit [s]')
-                          ),
-                          primaryYAxis: NumericAxis(
-                              axisLine: const AxisLine(
-                                  width: 1, color: Colors.black),
-                              majorTickLines: const MajorTickLines(size: 0),
-                              title: AxisTitle(
-                                  text: 'y [g]')
-                          ),
-
-                          backgroundColor: Colors.transparent,
-
-                        ),
-
-
-                      ),
-                    ),
-
-                  ],
+                Expanded(
+                  child: Container(
+                      alignment: Alignment.center, // You can use other alignments like Alignment.topLeft, Alignment.bottomRight, etc.
+                      decoration: BoxDecoration(borderRadius: BorderRadius.circular(50.0)),
+                      child: Center(
+                          child: Container(
+                            height: 30,
+                            width: 30,
+                            decoration: BoxDecoration(
+                                color: _is_connecting?Colors.green:Colors.red,
+                                borderRadius: BorderRadius.circular(15)
+                            ),
+                          )
+                      )
+                  ),
                 ),
-              ),
-              Flexible(
-                child: Row(
-                  children: <Widget>[
-                    Expanded(
-                      child: Container(
-                        margin: const EdgeInsets.all(8.0),
-                        padding: const EdgeInsets.all(10.0),
-                        decoration: BoxDecoration(
-                          color: Colors.white,
-                          borderRadius: BorderRadius.circular(10.0),
-                        ),
-                        child:
-                        SfCartesianChart(
-                          series: <LineSeries<LiveData, num>>[
-                            LineSeries<LiveData, num>(
-                              onRendererCreated: (
-                                  ChartSeriesController controller) {
-                                _chartSeriesController = controller;
-                              },
-                              dataSource: chartData,
-                              color: Colors.blue,
-                              xValueMapper: (LiveData sales, _) => sales.t,
-                              yValueMapper: (LiveData sales, _) => sales.z,
+              ],
+            ),
+          ),
+          Container(
+            margin: const EdgeInsets.all(8.0),
+            padding: const EdgeInsets.all(8.0),
+            decoration: BoxDecoration(
+              color: Colors.white,
+              borderRadius: BorderRadius.circular(10.0),
+            ),
+            child: SfCartesianChart(
+              series: <ChartSeries>[
+                LineSeries<LiveData, DateTime>(
+                    onRendererCreated: (ChartSeriesController controller) {
+                      _chartSeriesController = controller;
+                    },
+                    dataSource: chartData,
+                    color: Colors.red,
+                    xValueMapper: (LiveData sales, _) => sales.time,
+                    yValueMapper: (LiveData sales, _) => sales.x,
+                    name: 'X' // Legend label for this series
 
-
-                            )
-                          ],
-                          primaryXAxis: NumericAxis(
-                              majorGridLines: const MajorGridLines(
-                                  width: 0, color: Colors.black),
-                              edgeLabelPlacement: EdgeLabelPlacement.shift,
-                              interval: 1,
-                              title: AxisTitle(text: 'Zeit [s]')
-                          ),
-                          primaryYAxis: NumericAxis(
-                              axisLine: const AxisLine(
-                                  width: 1, color: Colors.black),
-                              majorTickLines: const MajorTickLines(size: 0),
-                              title: AxisTitle(
-                                  text: 'z [g]')
-                          ),
-
-                          backgroundColor: Colors.transparent,
-
-                        ),
-
-
-                      ),
-                    ),
-
-                  ],
                 ),
+
+                LineSeries<LiveData, DateTime>(
+                    onRendererCreated: (ChartSeriesController controller) {
+                      _chartSeriesController = controller;
+                    },
+                    dataSource: chartData,
+                    color: Colors.blue,
+                    xValueMapper: (LiveData sales, _) => sales.time,
+                    yValueMapper: (LiveData sales, _) => sales.y,
+                    name: 'Y' // Legend label for this series
+
+                ),
+
+                LineSeries<LiveData, DateTime>(
+                    onRendererCreated: (ChartSeriesController controller) {
+                      _chartSeriesController = controller;
+                    },
+                    dataSource: chartData,
+                    color: Colors.green,
+                    xValueMapper: (LiveData sales, _) => sales.time,
+                    yValueMapper: (LiveData sales, _) => sales.z,
+                    name: 'Z' // Legend label for this series
+                ),
+              ],
+              primaryXAxis: DateTimeAxis(
+                  majorGridLines: const MajorGridLines(width: 0.8),
+                  dateFormat: DateFormat('HH:mm:ss'), // set the form of the time
+                  edgeLabelPlacement: EdgeLabelPlacement.shift,
+                  interval: 1,
+                  title: AxisTitle(text: 'Zeit [s]')
               ),
-            ]
-        )
+              primaryYAxis: NumericAxis(
+                  axisLine: const AxisLine(width: 1, color: Colors.black),
+                  majorTickLines: const MajorTickLines(size: 0),
+                  title: AxisTitle(text: 'Values [g]')
+              ),
+              legend: Legend(isVisible: true),
+              backgroundColor: Colors.transparent,
+            ),
+          )
+        ]
     );
+
+
+
   }
 
   int t = 0;
 
   void updateDataSource(Timer timer) {
-    if (t < 10) {
-      chartData.add(LiveData(t++, _x, _y, _z, _time));
+    if (t < 15) {
+      chartData.add(LiveData(t++, _x, _y, _z, DateTime.now()));
       _chartSeriesController.updateDataSource(
           addedDataIndex: t);
     }
     else {
-      chartData.add(LiveData(t++, _x, _y, _z, _time));
+      chartData.add(LiveData(t++, _x, _y, _z, DateTime.now()));
       chartData.removeAt(0);
       _chartSeriesController.updateDataSource(
           addedDataIndex: chartData.length - 1, removedDataIndex: 0);
@@ -470,7 +296,7 @@ class _DashboardS2GridState extends State<DashboardS2Grid> {
 
   List<LiveData> getChartData() {
     return <LiveData>[
-      LiveData(0, 0, 0, 0, 0)
+      LiveData(0, 0, 0, 0, DateTime.now())
     ];
   }
 
@@ -486,6 +312,6 @@ class LiveData {
   final num x;
   final num y;
   final num z;
-  final num time;
+  final DateTime time;
 
 }

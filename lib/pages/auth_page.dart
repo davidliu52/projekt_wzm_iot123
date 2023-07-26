@@ -51,13 +51,16 @@ class _AuthWidgetState extends State<AuthWidget> {
 
 
   // Login Funktion mit thingsboardclient (Eingabe: email und Password)
-  void login(String email, String password) async {
+  Future<String?>  login(String email, String password) async {
     try {
       var tbClient = ThingsboardClient(thingsBoardApiEndpoint);
+    //  print(tbClient.toString());
 
       await
       tbClient.login(LoginRequest(email, password));
       final accessToken = tbClient.login(LoginRequest(email, password));
+
+
 
       //globals.token = true; (In Startseite muss gelöscht werden)
 
@@ -85,6 +88,7 @@ class _AuthWidgetState extends State<AuthWidget> {
         Provider.of<PageNotifier>(context, listen: false).goToMain();
 
       } else {
+
       }
 
       //print('authUser: ${tbClient.getAuthUser()}');
@@ -97,13 +101,38 @@ class _AuthWidgetState extends State<AuthWidget> {
       sharedPreferences.setString('access_token', accessToken.toString());
 
 
+      return null; // Return null if login was successful
+
 
     } catch (e, s) {
-      print('Error: $e');
+
+
+      print('the message of the Error: $e');
       print('Stack: $s');
+      if (e is ThingsboardError && e.message != null) {
+        //return'ThingsboardError: message: ${e.message}, errorCode: ${e.errorCode}, status: ${e.status}';// Return only the message part of the ThingsboardError
+        switch(e.message){
+          case "User account is not active":
+            return "Dein Konto wurde noch nicht aktiviert";
+          case "User account is locked due to security policy":
+            return "Dein Konto ist gesperrt. Wende dich an den Administrator";
+          case "Authentication failed":
+            return "Dein Konto ist gesperrt. Wende dich an den Administrator";
+          case "Invalid username or password":
+            return "Dein Konto ist gesperrt. Wende dich an den Administrator";
+          case "Token has expired":
+            return "Dein Konto ist gesperrt. Wende dich an den Administrator";
+          case "User password expired!":
+            return "Dein Konto ist gesperrt. Wende dich an den Administrator";
+          default:
+            return "Default Message";
+        }
+      }
+      return e.toString(); // Return the full error string as a fallback
+
+
     }
   }
-
 
   // void login(String email, String password) async{
   //   final storage = new FlutterSecureStorage();
@@ -215,18 +244,28 @@ class _AuthWidgetState extends State<AuthWidget> {
                     SizedBox(
                       height: 48,
                       child: ElevatedButton(   // Erstellung eines Buttons
-                        onPressed: (){
+                        onPressed: () async {
                           // login(_emailController.text.toString(), _passwordController.text.toString());
                           //login('tenant@thingsboard.org', 'tenant');
 
                           if(_formKey.currentState!.validate()) {
-
-                            login(_emailController.text.toString(), _passwordController.text.toString());
+                            String? errorMessage = await login(_emailController.text.toString(), _passwordController.text.toString());
+                            if (errorMessage != null) {
+                              showDialog(context: context, builder: (context) =>
+                                  AlertDialog(
+                                    title: Text('Error'),
+                                    content: Text(errorMessage),
+                                    actions: [
+                                      TextButton(
+                                          onPressed: () {
+                                            Navigator.of(context).pop();
+                                          },
+                                          child: Text('OK'))
+                                    ],
+                                  ));
+                            }
                           }
-
                           //Provider.of<PageNotifier>(context, listen: false).goToMain();
-
-
                         },
                         style: ButtonStyle(
                           backgroundColor: MaterialStateProperty.all(Color.fromRGBO(23, 156, 125, 1)),

@@ -1,11 +1,9 @@
 // Importieren benötigter Packages
 import 'package:flutter/material.dart';
-import 'package:projekt_wzm_iot/pages/main_page.dart';
 import 'package:projekt_wzm_iot/provider/page_notifier.dart';
-import 'package:projekt_wzm_iot/widgets/dashboard_grid.dart';
-import 'package:projekt_wzm_iot/widgets/dashboard_grid_S1.dart';
 import 'package:projekt_wzm_iot/widgets/dashboard_grid_S2.dart';
 import 'package:provider/provider.dart';
+import 'package:projekt_wzm_iot/pages/main_page.dart';
 
 
 class DashboardS2Page extends Page{

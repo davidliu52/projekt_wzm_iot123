@@ -1,16 +1,14 @@
 // Importieren benötigter Packages
 import 'package:flutter/material.dart';
-import 'package:projekt_wzm_iot/pages/main_page.dart';
 import 'package:projekt_wzm_iot/provider/page_notifier.dart';
-import 'package:projekt_wzm_iot/widgets/dashboard_grid.dart';
 import 'package:projekt_wzm_iot/widgets/dashboard_grid_M1.dart';
 import 'package:provider/provider.dart';
+import 'package:projekt_wzm_iot/pages/main_page.dart';
+
 
 
 class DashboardM1Page extends Page{
-
-  static final pageName = 'DashboardM1Page'; // Definition des Pagename
-
+  static const pageName = 'DashboardM1Page'; // Definition des Pagename
   @override
   Route createRoute(BuildContext context) {
     return MaterialPageRoute(
@@ -55,55 +53,36 @@ class _DashboardM1WidgetState extends State<DashboardM1Widget> {
               physics: const ClampingScrollPhysics(),
               slivers: <Widget>[
                 _buildHeader(),
-              const SliverPadding(
+
+               const SliverPadding(
                 padding: EdgeInsets.all(20.0),
                 sliver: SliverToBoxAdapter(
-                  child: Text(
-                    'Motor 1 Daten',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 20.0,
-                      fontWeight: FontWeight.bold,
-                    ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+
+                    children: [
+                      Text(
+                        'Motor 1 Daten',
+                        style: TextStyle(
+                          color: Colors.black,
+                          fontSize: 20.0,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+
+                    ],
                   ),
                 ),
               ),
 
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                const SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: 10.0),
                   sliver: SliverToBoxAdapter(
-                    child: DashboardM1Grid(),
+                    child: DashboardM1Grid(),// It will turn to the dashboard_grid_M1.dart. this file is responsible for the show of the all chart of Motor1
                   ),
                 ),
-
-
-
               ],
             )
-
-
-            // SafeArea(
-            //     child: Form(
-            //       child: ListView( // Listview erstellen
-            //         reverse: false,
-            //         // Alle Komponenten von unten anzeigen
-            //         // ListView Ende einstellen. fromLRTB (von links, rechts, oben und unten) MediaQuery.of(context).size.width: Displaygröße
-            //         padding: EdgeInsets.fromLTRB((MediaQuery.of(context).size.width - 320)/2, 30, (MediaQuery.of(context).size.width - 320)/2, 30),
-            //         children: [
-            //           SizedBox(height: 16,),
-            //           //   Leere Kiste hinzufügen (für die Positionierung)
-            //
-            //           Text('Hier ist Dashboard Page'),
-            //
-            //
-            //
-            //
-            //         ],
-            //       ),
-            //     ),
-            //
-            // ),
-
           ),
         ),
       ),
@@ -128,3 +107,5 @@ SliverPadding _buildHeader() {
     ),
   );
 }
+
+

@@ -1,10 +1,9 @@
 // Importieren benötigter Packages
 import 'package:flutter/material.dart';
-import 'package:projekt_wzm_iot/pages/main_page.dart';
 import 'package:projekt_wzm_iot/provider/page_notifier.dart';
-import 'package:projekt_wzm_iot/widgets/dashboard_grid.dart';
-import 'package:projekt_wzm_iot/widgets/dashboard_grid_M1.dart';
 import 'package:provider/provider.dart';
+import 'package:projekt_wzm_iot/widgets/dashboard_grid_M2.dart';
+import 'package:projekt_wzm_iot/pages/main_page.dart';
 
 
 class DashboardM2Page extends Page{
@@ -140,7 +139,7 @@ class _DashboardM2WidgetState extends State<DashboardM2Widget> {
                 SliverPadding(
                   padding: const EdgeInsets.symmetric(horizontal: 10.0),
                   sliver: SliverToBoxAdapter(
-                    child: DashboardM1Grid(),
+                    child: DashboardM2Grid(),
                   ),
                 ),
 

@@ -1,861 +1,538 @@
+import 'dart:typed_data';
 import 'package:flutter/material.dart';
-import 'package:projekt_wzm_iot/pages/dashboard_page.dart';
-import 'package:projekt_wzm_iot/pages/main_page.dart';
+import 'package:intl/intl.dart';
 import 'package:syncfusion_flutter_gauges/gauges.dart';
-import 'package:flutter/src/material/colors.dart';
 import 'package:syncfusion_flutter_charts/charts.dart';
 import 'dart:async';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'package:thingsboard_client/thingsboard_client.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:mqtt_client/mqtt_client.dart';
+import 'package:projekt_wzm_iot/mqtt_server_client.dart' if (dart.library.html) 'package:projekt_wzm_iot/mqtt_browser_client.dart' as mqttsetup;
+import '../pages/dashboard_page_M2.dart';
 
 
-class DashboardGrid extends StatefulWidget {
+//DashboardM2Grid is an independent class, solely for displaying the chart.
+
+class DashboardM2Grid extends StatefulWidget {
+  const DashboardM2Grid({super.key});
 
   @override
-  State<DashboardGrid> createState() => _DashboardGridState();
+  State<DashboardM2Grid> createState() => _DashboardGridM2State();
 }
 
-class _DashboardGridState extends State<DashboardGrid> {
-
+class _DashboardGridM2State extends State<DashboardM2Grid> {
+  Map<String, dynamic> pt = {};
   late List<LiveData> chartData;
   late ChartSeriesController _chartSeriesController;
+  Timer? _updateTimer;
+  Timer? _dataReadTimer;
+  Uint8List? image64;
+  final client = mqttsetup.setup('broker.emqx.io', 'uniqueID', 1883);
+
+// This function will initialize the function. It is called only once---------
 
   @override
-  void initState() {
-    chartData = getChartData();
-    Timer.periodic(const Duration(seconds: 1), updateDataSource);
+  void initState()  {
+    connectAndSubscribe(); // This is a custom function that be used to connect MQTT broker.
+    chartData = getChartData();// Prepare the data for the time series chart.
+    _updateTimer=  Timer.periodic(const Duration(seconds: 1), updateDataSource);//  This line is initializing a periodic timer that triggers every second. When the timer triggers, it calls the updateDataSource() function.
     super.initState();
   }
 
-  var tbClient = ThingsboardClient(thingsBoardApiEndpoint);
+  //---------initialize the parameter-----------
+
   bool _emergency_switch = false;
   bool _is_homing = false;
   bool _is_testing = false;
-  int _direction = 1;
+  bool _is_connecting = false;
+  String _direction = '';
+ // bool _direction=1;
   double _pwm_frequency = 0;
   double _speed = 0;
-  double _time = 0;
-  String _currentPage = DashboardPage.pageName;
-
+  //double _time = 0;
+  String _currentPage = DashboardM2Page.pageName;
   String get currentPage=>_currentPage;
 
+// dispose method used to release the memory allocated to variables when state object is removed.
+//If you turn off this page, the MQTT broker will be disconnected.The same for updateTimer and _dataReadTimer
 
-  Timer? _timer;
+  @override
+  void dispose() {
+    print("Connection status before disconnect: ${client.connectionStatus}");
+    client.disconnect();
+    print("Connection status after disconnect: ${client.connectionStatus}");
+    _updateTimer?.cancel(); // Cancel the timers
+    _dataReadTimer?.cancel();
+    super.dispose();
+  }
 
-  _DashboardGridState() {
-    login();
-
-
-    if(_currentPage == DashboardPage.pageName) {
-      _timer = Timer.periodic(const Duration(milliseconds: 1000), (_timer) {
-        dateneinlesen();
+  _DashboardGridM2State() {
+    if(_currentPage == DashboardM2Page.pageName) {
+      _dataReadTimer = Timer.periodic(const Duration(milliseconds: 3000), (_timer) {
+        dateneinlesen1();
+        // get date from the MQTT broker every one seconds to update the Datasource and result in the movement of time in the X axis.
       });
     }
   }
 
+//-----------MQTT_connection----begin----------------
 
-  // Thingsboard login
-  void login() async{
-    try{
-      await tbClient.login(LoginRequest(ID, PW));
-      print('isAuthenticated=${tbClient.isAuthenticated()}');
+  Future<void> connectAndSubscribe() async {
+    client.websocketProtocols = MqttClientConstants.protocolsSingleDefault;
+    client.logging(on: false);
+    client.keepAlivePeriod = 60;
+    client.onConnected = onConnected;
+    client.onSubscribed = onSubscribed;
+    client.pongCallback = pong;
 
-    } catch (e, s) {
-      print('Error: $e');
-      print('Stack: $s');
+    final connMess = MqttConnectMessage()
+        .withClientIdentifier('clientId-nofE1cE43b')
+        .withWillTopic('willtopic')
+        .withWillMessage('My Will message')
+        .startClean()
+        .withWillQos(MqttQos.atLeastOnce);
+    print('Client connecting....');
+    client.connectionMessage = connMess;
+    try {
+      await client.connect();
+    } on NoConnectionException catch (e) {
+      print('Client exception: $e');
+      client.disconnect();
+    } on SocketException catch (e) {
+      print('Socket exception: $e');
+      client.disconnect();
     }
+
+    if (client.connectionStatus!.state == MqttConnectionState.connected) {
+      _is_connecting = true;
+      print('Client connected');
+    } else {
+      print('Client connection failed - disconnecting, status is ${client.connectionStatus}');
+      client.disconnect();
+      return;
+    }
+
+//---------subscribe the topic ----------------
+
+    const subTopic = 'v1/devices/me/telemetry/pi_data';
+  //   const subTopic = 'Motor1/data';
+
+    print('Subscribing to the $subTopic topic');
+    client.subscribe(subTopic, MqttQos.atLeastOnce);
+    client.updates!.listen((List<MqttReceivedMessage<MqttMessage?>>? c) {
+      final recMess = c![0].payload as MqttPublishMessage;
+      final ptValue = MqttPublishPayload.bytesToStringAsString(recMess.payload.message);
+       setState(() {
+         pt = json.decode(ptValue);
+
+       });
+
+        print(pt);
+      print(pt['is_homing']);
+
+    });
+
   }
 
-  void dateneinlesen() async{
-    try{
-      // SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
-      // final accessToken = sharedPreferences.getString('access_token');
-      // final tbClient = ThingsboardClient(thingsBoardApiEndpoint);
-
-
-      if(tbClient.isAuthenticated() == true) {
-        var deviceName = 'My New Device';
-        var pageLink = PageLink(10);
-        PageData<DeviceInfo> devices;
-        devices =
-        await tbClient.getDeviceService().getTenantDeviceInfos(pageLink);
-        //Link mit Token eingeben
-        // print('devices: $devices');
-
-        var device = Device(deviceName, 'default');
-
-        var entityFilter = EntityNameFilter(
-            entityType: EntityType.DEVICE, entityNameFilter: deviceName);
-
-        var deviceFields = <EntityKey>[
-          EntityKey(type: EntityKeyType.ENTITY_FIELD, key: 'name'),
-          EntityKey(type: EntityKeyType.ENTITY_FIELD, key: 'type'),
-          EntityKey(type: EntityKeyType.ENTITY_FIELD, key: 'createdTime'),
-        ];
-
-        // !!!!!!!!!!!!!!timeseries start!!!!!!!!!!!!!!!!
-        var deviceTelemetry = <EntityKey>[
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'direction'),
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'emergency_switch'),
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'is_homing'),
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'is_testing'),
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'pwm_frequency'),
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'speed'),
-          EntityKey(type: EntityKeyType.TIME_SERIES, key: 'time'),
-        ];
-
-        var devicesQuery = EntityDataQuery(
-            entityFilter: entityFilter,
-            entityFields: deviceFields,
-            latestValues: deviceTelemetry,
-            pageLink: EntityDataPageLink(
-                pageSize: 10,
-                sortOrder: EntityDataSortOrder(
-                    key: EntityKey(
-                        type: EntityKeyType.ENTITY_FIELD, key: 'createdTime'),
-                    direction: EntityDataSortOrderDirection.DESC)));
-
-
-        var currentTime = DateTime
-            .now()
-            .millisecondsSinceEpoch;
-        var timeWindow = const Duration(hours: 1).inMilliseconds;
-
-        var tsCmd = TimeSeriesCmd(
-            keys: ([
-              'direction',
-              'emergency_switch',
-              'is_homing',
-              'is_testing',
-              'pwm_frequency',
-              'speed',
-              'time'
-            ]),
-            startTs: currentTime - timeWindow,
-            timeWindow: timeWindow);
-
-        var cmd = EntityDataCmd(query: devicesQuery, tsCmd: tsCmd);
-
-        var telemetryService = tbClient.getTelemetryService();
-
-        var subscription = TelemetrySubscriber(telemetryService, [cmd]);
-
-        subscription.entityDataStream.listen((entityDataUpdate) {
-          var whole_data = entityDataUpdate.toString();
-
-
-          //print(whole_data);
-
-          // direction ANFANG--------------------------------------------------------
-          int Anfang_dir = 0;
-          int len_wd = whole_data.length;
-          for (var i = 0; i < len_wd - 9; i++) {
-            if (whole_data.substring(i, i + 9) == 'direction') {
-              break;
-            }
-            Anfang_dir++;
-          }
-
-          int Ende_dir = Anfang_dir;
-
-          for (var i = Anfang_dir; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_dir++;
-          }
-
-          for (var i = Anfang_dir; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_dir++;
-          }
-
-
-          _direction = int.parse(whole_data.substring(Anfang_dir, Ende_dir));
-          // direction = direction.replaceAll(new RegExp(r'[^0-9]'),'');
-          // direction ANFANG--------------------------------------------------------
-
-
-          // is_homing ANFANG--------------------------------------------------------
-          int Anfang_ih = 0;
-          for (var i = 0; i < len_wd - 9; i++) {
-            if (whole_data.substring(i, i + 9) == 'is_homing') {
-              break;
-            }
-            Anfang_ih++;
-          }
-
-          int Ende_ih = Anfang_ih;
-
-          for (var i = Anfang_ih; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_ih++;
-          }
-
-          for (var i = Anfang_ih; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_ih++;
-          }
-
-          var is_homing = whole_data.substring(Anfang_ih, Ende_ih);
-          if (is_homing == 'true') {
-            _is_homing = true;
-          } else {
-            _is_homing = false;
-          }
-
-          // is_homing ENDE--------------------------------------------------------
-
-
-          // is_testing ANFANG--------------------------------------------------------
-          int Anfang_it = 0;
-          for (var i = 0; i < len_wd - 10; i++) {
-            if (whole_data.substring(i, i + 10) == 'is_testing') {
-              break;
-            }
-            Anfang_it++;
-          }
-
-          int Ende_it = Anfang_it;
-
-          for (var i = Anfang_it; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_it++;
-          }
-
-          for (var i = Anfang_it; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_it++;
-          }
-
-          var is_testing = whole_data.substring(Anfang_it, Ende_it);
-          if (is_testing == 'true') {
-            _is_testing = true;
-          } else {
-            _is_testing = false;
-          }
-
-
-          // is_testing ENDE--------------------------------------------------------
-
-          // emergency_switch ANFANG--------------------------------------------------------
-          int Anfang_es = 0;
-          for (var i = 0; i < len_wd - 16; i++) {
-            if (whole_data.substring(i, i + 16) == 'emergency_switch') {
-              break;
-            }
-            Anfang_es++;
-          }
-
-          int Ende_es = Anfang_es;
-
-          for (var i = Anfang_es; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_es++;
-          }
-
-          for (var i = Anfang_es; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_es++;
-          }
-
-          var emergency_switch = whole_data.substring(Anfang_es, Ende_es);
-          if (emergency_switch == 'true') {
-            _emergency_switch = true;
-          } else {
-            _emergency_switch = false;
-          }
-
-          // emergency_switch ENDE--------------------------------------------------------
-
-
-          // pwm_frequency ANFANG--------------------------------------------------------
-          int Anfang_pf = 0;
-          for (var i = 0; i < len_wd - 13; i++) {
-            if (whole_data.substring(i, i + 13) == 'pwm_frequency') {
-              break;
-            }
-            Anfang_pf++;
-          }
-
-          int Ende_pf = Anfang_pf;
-
-          for (var i = Anfang_pf; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_pf++;
-          }
-
-          for (var i = Anfang_pf; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_pf++;
-          }
-
-          _pwm_frequency =
-              double.parse(whole_data.substring(Anfang_pf, Ende_pf));
-
-          // pwm_frequency ENDE--------------------------------------------------------
-
-          // speed ANFANG--------------------------------------------------------
-          int Anfang_s = 0;
-          for (var i = 0; i < len_wd - 5; i++) {
-            if (whole_data.substring(i, i + 5) == 'speed') {
-              break;
-            }
-            Anfang_s++;
-          }
-
-          int Ende_s = Anfang_s;
-
-          for (var i = Anfang_s; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_s++;
-          }
-
-          for (var i = Anfang_s; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_s++;
-          }
-
-          _speed = double.parse(whole_data.substring(Anfang_s, Ende_s));
-          // speed ENDE--------------------------------------------------------
-
-
-          // time ANFANG--------------------------------------------------------
-          int Anfang_t = 0;
-          for (var i = 0; i < len_wd - 4; i++) {
-            if (whole_data.substring(i, i + 4) == 'time') {
-              break;
-            }
-            Anfang_t++;
-          }
-
-          int Ende_t = Anfang_t;
-
-          for (var i = Anfang_t; i < len_wd; i++) {
-            if (whole_data[i] == '}') {
-              break;
-            }
-            Ende_t++;
-          }
-
-          for (var i = Anfang_t; i < len_wd; i++) {
-            if (whole_data.substring(i - 7, i) == 'value: ') {
-              break;
-            }
-            Anfang_t++;
-          }
-
-          _time = double.parse(whole_data.substring(Anfang_t, Ende_t));
-          // time ENDE--------------------------------------------------------
-
-
-
-          setState(() {
-            _is_homing;
-            _direction;
-            _is_testing;
-            _emergency_switch;
-            _pwm_frequency;
-            _speed;
-            _time;
-          });
-        });
-
-
-        subscription.subscribe();
-
-        await Future.delayed(const Duration(seconds: 1));
-        // !!!!!!!!!!!!!!!!!!!!!!!!!timeseries end!!!!!!!!!!!!!!!!!!!!!!
-      }
-    } catch (e, s) {
-      print('Error: $e');
-      print('Stack: $s');
-    }
+  void onConnected() {
+    print('Connected to MQTT server');
   }
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-  void dateneinlesen2() async{
-    try{
-
-      var foundDevice = await tbClient.getDeviceService().getDeviceInfo('25c0a450-6332-11ed-8de5-891fb00a7c64');
-      var keys = await tbClient.getTelemetryService();
-      print('keys: $keys');
-      var attributes = await tbClient.getAttributeService().getAttributesByScope(
-          foundDevice!.id!,
-          AttributeScope.SHARED_SCOPE.toShortString(),
-          ['is_homing']
-      );
-      print('Found device attributes: $attributes');
-
-    } catch (e, s) {
-      print('Error: $e');
-      print('Stack: $s');
-    }
+  void onSubscribed(String topic) {
+    print('Subscribed to topic: $topic');
   }
 
+  void pong() {
+    print('Ping response client callback invoked');
+  }
 
-  void dateneinlesen3() async{
-    try{
-
-      var deviceName = 'My New Device';
-
-      var pageLink = PageLink(10);
-      PageData<DeviceInfo> devices;
-      devices = await tbClient.getDeviceService().getTenantDeviceInfos(pageLink);
-      //Link mit Token eingeben
-      // print('devices: $devices');
-
-      var device = Device(deviceName, 'default');
-
-      var entityFilter = EntityNameFilter(
-          entityType: EntityType.DEVICE, entityNameFilter: deviceName);
-
-      var deviceFields = <EntityKey>[
-        EntityKey(type: EntityKeyType.ENTITY_FIELD, key: 'name'),
-        EntityKey(type: EntityKeyType.ENTITY_FIELD, key: 'type'),
-        EntityKey(type: EntityKeyType.ENTITY_FIELD, key: 'createdTime'),
-      ];
-
-      // !!!!!!!!!!!!!!timeseries start!!!!!!!!!!!!!!!!
-      var deviceTelemetry = <EntityKey>[
-        EntityKey(type: EntityKeyType.ATTRIBUTE, key: 'direction'),
-
-      ];
-
-      var devicesQuery = EntityDataQuery(
-          entityFilter: entityFilter,
-          entityFields: deviceFields,
-          latestValues: deviceTelemetry,
-          pageLink: EntityDataPageLink(
-              pageSize: 10,
-              sortOrder: EntityDataSortOrder(
-                  key: EntityKey(
-                      type: EntityKeyType.ENTITY_FIELD, key: 'createdTime'),
-                  direction: EntityDataSortOrderDirection.DESC)));
+//----------------MQTT_connection---end-----------------------
 
 
-      // var tsCmd = TimeSeriesCmd(
-      //     keys: (['direction', 'emergency_switch', 'is_homing', 'is_testing', 'pwm_frequency', 'speed']),
-      //     startTs: currentTime - timeWindow,
-      //     timeWindow: timeWindow);
+//--------read the specific values from the pt dataset(MQTT broker)----------
 
-      var cmd = EntityDataCmd(query: devicesQuery);
+  void dateneinlesen1()  {
+    if (!mounted) return; // Check if widget is still mounted
 
-      var telemetryService = tbClient.getTelemetryService();
+   // setState(() {     //setState notify that the parameters inside will update.
+      _direction = pt['direction'];
+    _pwm_frequency = double.parse(pt['pwm_frequency'].toString());
 
-      var subscription = TelemetrySubscriber(telemetryService, [cmd]);
-      print(subscription);
-      subscription.entityDataStream.listen((entityDataUpdate) {
-
-
-        //----------------------Suche nach Werte-------------------
-        print('_------------------Anfang--------------------');
-        var whole_data = entityDataUpdate.toString();
-
-        print(whole_data);
-        int Anfang = 0;
-        int len_wd = whole_data.length;
-        for (var i = 0; i<len_wd-9; i++) {
-
-          if(whole_data.substring(i,i+9) == 'direction'){
-            break;
-
-          }
-          Anfang++;
-        }
-
-        int Ende = 0;
-
-        for (var i = 0; i<len_wd-26; i++) {
-
-          if(whole_data.substring(i,i+26) == 'EntityKeyType.ENTITY_FIELD'){
-            break;
-
-          }
-          Ende++;
-        }
-
-        print(whole_data.substring(Anfang,Ende));
-        //----------------------Suche nach Werte-------------------
-
-        // var whole_data_Nr = whole_data.replaceAll(new RegExp(r'[^0-9]'),'');
-        //
-        // whole_data_Nr = whole_data_Nr.substring(22);
-        // print(whole_data_Nr);
-        // int Anfang = 0;
-        // int len_wdN = whole_data_Nr.length;
-        //
-        // for (var i = 0; i<len_wdN-10; i++) {
-        //
-        //   if(whole_data_Nr.substring(i,i+10) == '1671058795'){
-        //     break;
-        //
-        //   }
-        //   Anfang++;
-        //  }
-        // var result = whole_data_Nr.substring(0,Anfang-1);
-        // print(result);
-        // // var result = whole_data_Nr.substring(0,Anfang-1);
-
-        // print(result);
-
-        // var len_wdN = whole_data_Nr.length;
-        // for (var i = 0; i<len_wdN; i++) {
-        //   if
-        //   whole_data_Nr =
-        // }
-
-
-        // String StrC = '';
-        // do {
-        //
-        //   StrC = whole_data;
-        //
-        // } while(StrC == '');
-        // print('whole_data 2222222222222: $whole_data_Nr');
-        // for(int i=0;i<str.length;i++){
-        //     List<String> s = str[i].split(":");
-        //     result.putIfAbsent(s[0].trim(), () => s[1].trim());
-        // }
-        //   print('result!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!');
-        //   print('result: $result');
-        //   return result;
-        // }
-        // print('result!!!!!!!!!!!!!!!!: $whole_data_Nr');
-        // var decoded = json.decode(whole_data.toString());
-        // var map = Map.fromIterable(decoded, key: (e) => e.keys.first, value: (e) => e.values.first);
-
-
-        // whole_data in json konvertieren (Youtube)
-        //
-        // print('Received entity data update: $map');
-        // print('type of whole_data: ${map.runtimeType}');
-
-        // var wholedata = entityDataUpdate.update!.asMap();
-        // print(wholedata.runtimeType);
-        //
-        // print(wholedata['0']);
-        //
-        // var keys = wholedata.keys.toList();
-        // print('keys: $keys');
-        // var val = wholedata[keys];
-        // print('values: $val');
-
-
-        print('---------------------Ende---------------------');
-      });
-
-
-      print('------------------------------------------------');
-
-
-
-      subscription.subscribe();
-
-      await Future.delayed(const Duration(seconds: 1));
-      // !!!!!!!!!!!!!!!!!!!!!!!!!timeseries end!!!!!!!!!!!!!!!!!!!!!!
-
-    } catch (e, s) {
-      print('Error: $e');
-      print('Stack: $s');
-    }
+    _speed = double.parse(pt['speed'].toString());
+      _is_homing = pt['is_homing'];
+      _is_testing = pt['is_testing'];
+      _is_connecting = _is_connecting;
+      _emergency_switch = pt['emergency_switch'] ;
+ //   });
   }
 
 
   @override
   Widget build(BuildContext context) {
-    return Container(
+//-----isPortrait will detect the orientation of the device, The boolean value will be used to call the function to change the layout of the charts.
+    bool isPortrait = MediaQuery.of(context).orientation == Orientation.portrait;
 
-      //height: MediaQuery.of(context).size.height * 0.5,
-      height: 1400,
+//-----------Handling the disposition of the two Time Series Line Charts, including their display and layout arrangement------------
 
-      child: Column(
-        children: <Widget>[
-          Container(
-            height: 80,
-            color: const Color.fromRGBO(23, 156, 125, 0.5),
-            child: Row(
-              children: <Widget>[
-                _buildStatCard('Systemzustand', 'ON / OFF',  _emergency_switch?Colors.green:Colors.red),
-                _buildStatCard('Test läuft', 'ON / OFF',  _is_testing?Colors.green:Colors.red),
-              ],
-            ),
+    //-------A standalone widget just for displaying a Time Series Line Chart for the PWM values-----------
+
+    Widget Timeserieschart_pwm() {
+      return Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10.0),
           ),
-
-          Container(
-            height: 80,
-            color: const Color.fromRGBO(23, 156, 125, 0.5),
-            child: Row(
-              children: <Widget>[
-
-                _buildStatCard('Home Position', 'ON / OFF',  _is_homing?Colors.green:Colors.red),
-
-                _buildStatCard_direction('Drehrichtung', '',  _direction==1?const IconData(0xe540, fontFamily: 'MaterialIcons'):const IconData(0xe53f, fontFamily: 'MaterialIcons')),
-              ],
-            ),
-          ),
-
-          const SizedBox(height: 10,),
-          const Text('PWM Signal', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),),
-          Container(
-              height: 200,
-              child:
-              SfRadialGauge(
-                axes: <RadialAxis>[
-                  RadialAxis(minimum: 0, maximum: 300, labelOffset: 10,
-                    axisLineStyle: const AxisLineStyle(
-                        thicknessUnit: GaugeSizeUnit.factor,thickness: 0.03),
-                    majorTickStyle: const MajorTickStyle(length: 12,thickness: 3,color: Colors.black),
-                    minorTickStyle: const MinorTickStyle(length: 7,thickness: 1,color: Colors.black),
-                    axisLabelStyle: const GaugeTextStyle(color: Colors.black,fontSize: 13 ),
-                    ranges: <GaugeRange>[
-                      GaugeRange(startValue: 0, endValue: 300, sizeUnit: GaugeSizeUnit.factor, startWidth: 0.1, endWidth: 0.1,
-                        gradient: const SweepGradient(
-                            colors: <Color>[Colors.white,Colors.red],
-                            stops: <double>[0.0,1]
-                        ),
-                      ),
-                    ],
-                    pointers: <GaugePointer>[NeedlePointer(value: _pwm_frequency, needleLength: 0.95, enableAnimation: true,
-                      animationType: AnimationType.ease, needleStartWidth: 1, needleEndWidth: 3, needleColor: Colors.red,
-                    ),],
-                    annotations: <GaugeAnnotation>[
-                      GaugeAnnotation(widget: Column(
-                        children: <Widget>[
-                          Text(_pwm_frequency.toString(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),),
-                          const SizedBox(height: 5,),
-                          const Text('Hz', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),)
-                        ],
-                      ), angle: 90, positionFactor: 1.5, )],
-                  ),
-                ],
+          child: SfCartesianChart(
+            series: <LineSeries<LiveData, DateTime>>[
+              LineSeries<LiveData, DateTime>(
+                onRendererCreated: (ChartSeriesController controller) {
+                  _chartSeriesController = controller;
+                },
+                dataSource: chartData,
+                color: const Color.fromRGBO(192, 108, 132, 1),
+                xValueMapper: (LiveData sales, _) => sales.time,
+                yValueMapper: (LiveData sales, _) => sales.signal,
               )
+            ],
+            primaryXAxis: DateTimeAxis(
+                majorGridLines: const MajorGridLines(width: 0.8),
+                dateFormat: DateFormat('HH:mm:ss'), // set the form of the time
+                edgeLabelPlacement: EdgeLabelPlacement.shift,
+                interval: 1,
+                title: AxisTitle(text: 'Zeit [s]')
+            ),
+            primaryYAxis: NumericAxis(
+                axisLine: const AxisLine(width: 1, color: Colors.black),
+                majorTickLines: const MajorTickLines(size: 0),
+                title: AxisTitle(text: 'PWM Signal [Hz]')
+            ),
+            backgroundColor: Colors.transparent,
+          )
+      );
+    }
+
+
+    //-------A standalone widget just for displaying a Time Series Line Chart for the Speed values-----------
+
+    Widget Timeserieschart_speed() {
+      return Container(
+          margin: const EdgeInsets.all(8),
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(10.0),
           ),
-          const SizedBox(height: 10,),
+          child: SfCartesianChart(
+            series: <LineSeries<LiveData, DateTime>>[
+              LineSeries<LiveData, DateTime>(
+                onRendererCreated: (ChartSeriesController controller) {
+                  _chartSeriesController = controller;},
+                dataSource: chartData,
+                color: const Color.fromRGBO(192, 108, 132, 1),
+                xValueMapper: (LiveData sales, _)=> sales.time,
+                yValueMapper: (LiveData sales, _) => sales.speed,
+              )
+            ],
+            primaryXAxis: DateTimeAxis(
+                majorGridLines: const MajorGridLines(width: 0.8),
+                edgeLabelPlacement: EdgeLabelPlacement.shift,
+                dateFormat: DateFormat('HH:mm:ss'), // set the form of time
+                interval: 1,
+                title: AxisTitle(text: 'Zeit [s]')
+            ),
+            primaryYAxis: NumericAxis(
+                axisLine: const AxisLine(width: 1, color: Colors.black),
+                majorTickLines: const MajorTickLines(size: 0),
+                title: AxisTitle(text: 'Motorgeschwindigkeit [U/min]')
+            ),
+            backgroundColor: Colors.transparent,
+          )
+      );
+    }
 
-          Container(
-            color: const Color.fromRGBO(23, 156, 125, 0.5),
+//-------------Functions used to modify the layout---------------
 
-            child: Column(
+    // For instance, if the device is currently in portrait mode, it will invoke the buildColumn_Timeserieschart() function.
+    // This function arranges the two Time Series Line Charts vertically in a column.
+
+    Widget buildColumn(){
+      return  Column(
+        children: [
+          Container(child: Timeserieschart_pwm()),
+          Container(child: Timeserieschart_speed()),
+        ],
+      );
+    }
+
+    Widget buildRow(){
+      return  Row(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Expanded(child:Timeserieschart_pwm()),
+          Expanded(child:Timeserieschart_speed(),
+          ),
+        ],
+      );
+    }
+
+//------------Handling of the chart layout is complete-------------------------
+
+
+//-----------Handling the disposition of the two Radial Gauge Charts, including their display and layout arrangement------------
+
+// ---------A standalone widget just for displaying a  Radial Gauge Chart for the PWM values-----------
+
+    Widget buildPWM_gauges(){
+      return Container(
+          color: Colors.white,
+          child: Column(
               children: [
                 const SizedBox(height: 10,),
-
-                const Text('Speed', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),),
-
-                Container(
+                const Text('PWM Signal', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),),
+                SizedBox(
                     height: 200,
-
                     child:
                     SfRadialGauge(
-
                       axes: <RadialAxis>[
-                        RadialAxis(minimum: 0, maximum: 100, labelOffset: 10,
+                        RadialAxis(minimum: 0, maximum: 300, labelOffset: 10,
                           axisLineStyle: const AxisLineStyle(
-                              thicknessUnit: GaugeSizeUnit.factor,thickness: 0.1),
+                              thicknessUnit: GaugeSizeUnit.factor,thickness: 0.03),
                           majorTickStyle: const MajorTickStyle(length: 12,thickness: 3,color: Colors.black),
                           minorTickStyle: const MinorTickStyle(length: 7,thickness: 1,color: Colors.black),
                           axisLabelStyle: const GaugeTextStyle(color: Colors.black,fontSize: 13 ),
                           ranges: <GaugeRange>[
-                            GaugeRange(startValue: 0, endValue: 100, sizeUnit: GaugeSizeUnit.factor, startWidth: 0.1, endWidth: 0.1,
+                            GaugeRange(startValue: 0, endValue: 300, sizeUnit: GaugeSizeUnit.factor, startWidth: 0.1, endWidth: 0.1,
                               gradient: const SweepGradient(
-                                  colors: <Color>[Colors.white54,Colors.white54],
+                                  colors: <Color>[Colors.white,Colors.red],
                                   stops: <double>[0.0,1]
                               ),
                             ),
                           ],
-                          pointers: <GaugePointer>[RangePointer(value: _speed, width: 0.1, sizeUnit: GaugeSizeUnit.factor,
-                            gradient: const SweepGradient(colors: <Color>[Colors.red, Color(0xFFC41A3B)], stops: <double>[0.25, 0.75]),
-
+                          pointers: <GaugePointer>[NeedlePointer(value: _pwm_frequency.toDouble(), needleLength: 0.95, enableAnimation: true,
+                            animationType: AnimationType.ease, needleStartWidth: 1, needleEndWidth: 3, needleColor: Colors.red,
                           ),],
                           annotations: <GaugeAnnotation>[
-                            GaugeAnnotation(widget: Container(child:
-                            Column(
+                            GaugeAnnotation(widget: Column(
                               children: <Widget>[
-                                Text(_speed.toString(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),),
+                                Text(_pwm_frequency.toString(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),),
                                 const SizedBox(height: 5,),
-                                const Text('rpm', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),)
+                                const Text('Hz', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),)
                               ],
-                            )
                             ), angle: 90, positionFactor: 1.5, )],
                         ),
-
                       ],
-
                     )
                 ),
-              ],
-            ),
-          ),
+              ]
+          )
+      );
+    }
 
 
+// -------A standalone widget just for displaying a Radial Gauge Chart for the Speed values-----------
 
-          Flexible(
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.all(8.0),
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                    child:
-                    SfCartesianChart(
-                      series: <LineSeries<LiveData, num>>[
-                        LineSeries<LiveData, num>(
-                          onRendererCreated: (ChartSeriesController controller) {
-                            _chartSeriesController = controller;
-                          },
-                          dataSource: chartData,
-                          color: const Color.fromRGBO(192, 108, 132, 1),
-                          xValueMapper: (LiveData sales, _) => sales.t,
-                          yValueMapper: (LiveData sales, _) => sales.signal,
-
-
-                        )
+    Widget buildSpeed_gauges(){
+      return Container(
+        color: const Color.fromRGBO(23, 156, 125, 0.5),
+        child: Column(
+          children: [
+            const SizedBox(height: 10,),
+            const Text('Speed', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+            SizedBox(
+                height: 200,
+                child:
+                SfRadialGauge(
+                  axes: <RadialAxis>[
+                    RadialAxis(minimum: 0, maximum: 100, labelOffset: 10,
+                      axisLineStyle: const AxisLineStyle(
+                          thicknessUnit: GaugeSizeUnit.factor,thickness: 0.1),
+                      majorTickStyle: const MajorTickStyle(length: 12,thickness: 3,color: Colors.black),
+                      minorTickStyle: const MinorTickStyle(length: 7,thickness: 1,color: Colors.black),
+                      axisLabelStyle: const GaugeTextStyle(color: Colors.black,fontSize: 13 ),
+                      ranges: <GaugeRange>[
+                        GaugeRange(startValue: 0, endValue: 100, sizeUnit: GaugeSizeUnit.factor, startWidth: 0.1, endWidth: 0.1,
+                          gradient: const SweepGradient(
+                              colors: <Color>[Colors.white54,Colors.white54],
+                              stops: <double>[0.0,1]
+                          ),
+                        ),
                       ],
-                      primaryXAxis: NumericAxis(
-                          majorGridLines: const MajorGridLines(width: 0, color: Colors.black),
-                          edgeLabelPlacement: EdgeLabelPlacement.shift,
-                          interval: 1,
-                          title: AxisTitle(text: 'Zeit [s]')
-                      ),
-                      primaryYAxis: NumericAxis(
-                          axisLine: const AxisLine(width: 1, color: Colors.black),
-                          majorTickLines: const MajorTickLines(size: 0),
-                          title: AxisTitle(text: 'PWM Signal [Hz]')
-                      ),
+                      pointers: <GaugePointer>[RangePointer(value: _speed, width: 0.1, sizeUnit: GaugeSizeUnit.factor,
+                        gradient: const SweepGradient(colors: <Color>[Colors.red, Color(0xFFC41A3B)], stops: <double>[0.25, 0.75]),
 
-                      backgroundColor: Colors.transparent,
-
-                    ),
-
-
-
-                  ),
-                ),
-
-              ],
-            ),
-          ),
-          Flexible(
-            child: Row(
-              children: <Widget>[
-                Expanded(
-                  child: Container(
-                    margin: const EdgeInsets.all(8.0),
-                    padding: const EdgeInsets.all(10.0),
-                    decoration: BoxDecoration(
-                      color: Colors.white,
-                      borderRadius: BorderRadius.circular(10.0),
-                    ),
-                    child:
-                    SfCartesianChart(
-                      series: <LineSeries<LiveData, num>>[
-                        LineSeries<LiveData, num>(
-                          onRendererCreated: (ChartSeriesController controller) {
-                            _chartSeriesController = controller;
-                          },
-                          dataSource: chartData,
-                          color: const Color.fromRGBO(192, 108, 132, 1),
-                          xValueMapper: (LiveData sales, _) => sales.t,
-                          yValueMapper: (LiveData sales, _) => sales.speed,
-
-
-                        )
+                       ),
                       ],
-                      primaryXAxis: NumericAxis(
-                          majorGridLines: const MajorGridLines(width: 0, color: Colors.black),
-                          edgeLabelPlacement: EdgeLabelPlacement.shift,
-                          interval: 1,
-                          title: AxisTitle(text: 'Zeit [s]')
-                      ),
-                      primaryYAxis: NumericAxis(
-                          axisLine: const AxisLine(width: 1, color: Colors.black),
-                          majorTickLines: const MajorTickLines(size: 0),
-                          title: AxisTitle(text: 'Motorgeschwindigkeit [U/min]')
-                      ),
-
-                      backgroundColor: Colors.transparent,
-
+                      annotations: <GaugeAnnotation>[
+                        GaugeAnnotation(widget: Column(
+                          children: <Widget>[
+                            Text(_speed.toString(), style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),),
+                            const SizedBox(height: 5,),
+                            const Text('rpm', style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold),)
+                          ],
+                        ), angle: 90, positionFactor: 1.5, )],
                     ),
-
-
-
-                  ),
-                ),
-
-              ],
+                  ],
+                )
             ),
-          ),
+          ],
+        ),
+      );
+    }
 
+
+//-------------Functions used to modify the layout---------------
+
+    // For instance, if the device is currently in portrait mode, it will invoke the buildRow_gauges() function.
+    // This function arranges the two Radial Gauge Chart vertically in a column.
+
+    Widget buildRow_gauges(){
+      return Container(
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Expanded(child:buildPWM_gauges()),
+            Expanded(child:buildSpeed_gauges()),
+          ],
+        ),
+      );
+    }
+
+    Widget buildColumn_gauges(){
+      return Column(
+        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+        children: [
+          Container(child: buildPWM_gauges()),
+          Container(child: buildSpeed_gauges()),
         ],
-      ),
+      );
+    }
+
+//------------Handling of the chart layout is complete-------------------------
+
+
+//--------------Displaying all the information related to Motor2, It includes five main container--------
+
+    return Column(
+      children: <Widget>[
+
+        //-----------The first container displays the status of the connection with the MQTT broker--------
+
+        Container(
+          height:80,
+          color: Colors.blue[100],
+          padding: const EdgeInsets.all(5.0),
+          child: Row(
+            children: [
+              Expanded(
+                child: Container(
+                  decoration: BoxDecoration( borderRadius: BorderRadius.circular(50.0)),
+                  alignment: Alignment.center,
+                  child: const Text(' Connection to MQTT',
+                      style:TextStyle(
+                        color: Colors.black,
+                        fontSize: 15.0,
+                        fontWeight: FontWeight.w600 ,)
+                  ),
+                ),
+              ),
+              Expanded(
+                child: Container(
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(50.0)),
+                    child: Center(
+                        child: Container(
+                          height: 30,
+                          width: 30,
+                          decoration: BoxDecoration(
+                              color: _is_connecting?Colors.green:Colors.red,
+                              borderRadius: BorderRadius.circular(15)
+                          ),
+                        )
+                    )
+                ),
+              ),
+            ],
+          ),
+        ),
+
+        //-----------The second container displays the status of two parameters of Motor1 (Systemzustand, Test läuft)",
+        // it uses function _buildStatCard() to design the layout-------
+
+        Container(
+          height: 80,
+          color: const Color.fromRGBO(23, 156, 125, 0.5),
+          child: Row(
+            children: <Widget>[
+              _buildStatCard('Systemzustand', 'ON / OFF',  _emergency_switch?Colors.green:Colors.red),
+              _buildStatCard('Test läuft', 'ON / OFF',  _is_testing?Colors.green:Colors.red),
+            ],
+          ),
+        ),
+
+        //-----------The third container displays the status of two parameters of Motor1 (Home Position, Drehrichtung)"
+        // it uses function _buildStatCard() and _buildStatCard_direction to design the layout---
+
+        Container(
+          height: 80,
+          color: const Color.fromRGBO(23, 156, 125, 0.5),
+          child: Row(
+            children: <Widget>[
+              _buildStatCard('Home Position', 'ON / OFF',  _is_homing?Colors.green:Colors.red),
+              _buildStatCard_direction('Drehrichtung', '',  _direction=='VorwÃ¤rts'?const IconData(0xe540, fontFamily: 'MaterialIcons'):const IconData(0xe53f, fontFamily: 'MaterialIcons')),
+            ],
+          ),
+        ),
+
+        const SizedBox(height: 10,),
+
+        //----------The fourth container displays two gauge charts, which may be arranged in a column or row, depending on the value of isPortrait.----------
+
+        isPortrait ? buildColumn_gauges() : buildRow_gauges(),
+
+        //----------The fifth container displays two Time Series Line Charts, which may be arranged in a column or row, depending on the value of isPortrait.----------
+
+        isPortrait ? buildColumn() : buildRow(),
+
+        const SizedBox(height: 50,),
+
+      ],
     );
   }
+  //---- Widget build(BuildContext context) ends. The main structure of the layout is complete---------------
+
+
+
+// The function updateDataSource() updates the data source for the chart every second,
+  //The updateDataSource() function is adding new data to chartData, which is a list of LiveData objects.
+  // If less than 8 seconds have passed, it simply adds new data to chartData
+  // After 8 seconds, it also removes the oldest data point to maintain a steady flow of data on the chart
 
   int t = 0;
   void updateDataSource(Timer timer) {
-    if (t < 10) {
-      chartData.add(LiveData(t++, _speed, _pwm_frequency, _time));
+    if (t < 8) {
+      chartData.add(LiveData(t++, _speed, _pwm_frequency, DateTime.now()));
       _chartSeriesController.updateDataSource(
           addedDataIndex: t);
     }
     else {
-      chartData.add(LiveData(t++, _speed, _pwm_frequency, _time));
+      chartData.add(LiveData(t++, _speed, _pwm_frequency, DateTime.now()));
       chartData.removeAt(0);
       _chartSeriesController.updateDataSource(
           addedDataIndex: chartData.length - 1, removedDataIndex: 0);
     }
   }
 
+  // The function getChartData() initializes the chart data with one data point with default values
 
   List<LiveData> getChartData() {
     return <LiveData>[
-      LiveData(0, 0, 0, 0)
+      LiveData(0, 0, 0, DateTime.now())
     ];
   }
 
+//------This function is  responsible for the layout of the three parameters (Systemzustand,Test läuft, Home Position)-----
 
   Expanded _buildStatCard(String title, String count, MaterialColor zustandscolor) {
     return Expanded(
@@ -869,7 +546,6 @@ class _DashboardGridState extends State<DashboardGrid> {
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           crossAxisAlignment: CrossAxisAlignment.center,
           children: <Widget>[
-
             Text(
               title,
               style: const TextStyle(
@@ -894,7 +570,7 @@ class _DashboardGridState extends State<DashboardGrid> {
   }
 }
 
-
+//------This function is  responsible for the layout of the  parameters (Drehrichtung)-------
 
 Expanded _buildStatCard_direction(String title, String count, IconData icon) {
   return Expanded(
@@ -908,7 +584,6 @@ Expanded _buildStatCard_direction(String title, String count, IconData icon) {
         mainAxisAlignment: MainAxisAlignment.spaceBetween,
         crossAxisAlignment: CrossAxisAlignment.center,
         children: <Widget>[
-
           Text(
             title,
             style: const TextStyle(
@@ -917,25 +592,20 @@ Expanded _buildStatCard_direction(String title, String count, IconData icon) {
               fontWeight: FontWeight.w600,
             ),
           ),
-
           Icon(icon, size: 35,)
-
-
-
         ],
       ),
     ),
   );
 }
 
-
-
+//------- Define the LiveData class to hold each data point for the chart------
 
 class LiveData {
   LiveData(this.t, this.speed, this.signal, this.time);
   final int t;
   final num speed;
   final num signal;
-  final num time;
+  final DateTime time;
 
 }

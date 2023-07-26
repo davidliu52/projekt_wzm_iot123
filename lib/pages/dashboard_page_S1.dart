@@ -1,10 +1,9 @@
 // Importieren benötigter Packages
 import 'package:flutter/material.dart';
-import 'package:projekt_wzm_iot/pages/main_page.dart';
 import 'package:projekt_wzm_iot/provider/page_notifier.dart';
-import 'package:projekt_wzm_iot/widgets/dashboard_grid.dart';
 import 'package:projekt_wzm_iot/widgets/dashboard_grid_S1.dart';
 import 'package:provider/provider.dart';
+import 'package:projekt_wzm_iot/pages/main_page.dart';
 
 
 class DashboardS1Page extends Page{
@@ -25,9 +24,7 @@ class DashboardS1Widget extends StatefulWidget {
   @override
   State<DashboardS1Widget> createState() => _DashboardS1WidgetState();
 }
-
 class _DashboardS1WidgetState extends State<DashboardS1Widget> {
-
 
   @override
   Widget build(BuildContext context) {
@@ -123,12 +120,12 @@ class _DashboardS1WidgetState extends State<DashboardS1Widget> {
               physics: ClampingScrollPhysics(),
               slivers: <Widget>[
                 _buildHeader(),
-              SliverPadding(
-                padding: const EdgeInsets.all(20.0),
+              const SliverPadding(
+                padding: EdgeInsets.all(20.0),
                 sliver: SliverToBoxAdapter(
                   child: Text(
                     'Sensor 1 Daten',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.black,
                       fontSize: 20.0,
                       fontWeight: FontWeight.bold,
@@ -177,17 +174,15 @@ class _DashboardS1WidgetState extends State<DashboardS1Widget> {
       ),
     );
   }
-
 }
 
 SliverPadding _buildHeader() {
-  return SliverPadding(
-
-    padding: const EdgeInsets.all(20.0),
+  return const SliverPadding(
+    padding: EdgeInsets.all(20.0),
     sliver: SliverToBoxAdapter(
       child: Text(
         'Dashboard Sensor 1',
-        style: const TextStyle(
+        style: TextStyle(
           color: Color.fromRGBO(23, 156, 125, 1),
           fontSize: 25.0,
           fontWeight: FontWeight.bold,

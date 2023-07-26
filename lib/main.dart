@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:projekt_wzm_iot/pages/dashboard_page.dart';
 import 'package:projekt_wzm_iot/pages/dashboard_page_M1.dart';
 import 'package:projekt_wzm_iot/pages/dashboard_page_M2.dart';
 import 'package:projekt_wzm_iot/pages/dashboard_page_S1.dart';
@@ -11,10 +10,11 @@ import 'package:projekt_wzm_iot/pages/setting_page.dart';
 import 'package:provider/provider.dart';
 import 'package:projekt_wzm_iot/provider/page_notifier.dart';
 import 'package:projekt_wzm_iot/pages/auth_page.dart';
+import 'package:projekt_wzm_iot/pages/AR-Dashboard_page.dart';
 
 
-
-void main() {
+void main()   {
+  WidgetsFlutterBinding.ensureInitialized();
   runApp(const MyApp());
 }
 
@@ -30,18 +30,15 @@ class MyApp extends StatelessWidget {
         title: 'Fraunhofer IoT System',
         theme: ThemeData(
 
-          //primarySwatch: Colors.red,
           primarySwatch: Colors.green,
         ),
         home: Consumer<PageNotifier>(
           builder: (context, pageNotifier, child){
             return Navigator(
               pages: [
-                MaterialPage(
+                const MaterialPage(
                   key: ValueKey(MainPage.pageName),
                   child: MainWidget()
-
-
                 ),
                 if(pageNotifier.currentPage == MainPage.pageName) MainPage(), // wenn pageName MainPage ist, wird MainPage ausgegeben.
                 if(pageNotifier.currentPage == AuthPage.pageName) AuthPage(), // wenn pageName AuthPage ist, wird AuthPage ausgegeben.
@@ -52,6 +49,7 @@ class MyApp extends StatelessWidget {
                 if(pageNotifier.currentPage == PWresetPage.pageName) PWresetPage(), // wenn pageName PWresetPage ist, wird PWresetPage ausgegeben.
                 if(pageNotifier.currentPage == SettingPage.pageName) SettingPage(), // wenn pageName SettingPage ist, wird SettingPage ausgegeben.
                 if(pageNotifier.currentPage == FAQPage.pageName) FAQPage(), // wenn pageName FAQPage ist, wird FAQPage ausgegeben.
+                if(pageNotifier.currentPage == ARcode.pageName) ARcode(), // wenn pageName ARcode ist, wird ARcode ausgegeben.
 
                 //if(pageNotifier.currentPage == AuthPage.pageName) AuthPage(), // wenn pageName AuthPage ist, wird AuthPage ausgegeben.
 
