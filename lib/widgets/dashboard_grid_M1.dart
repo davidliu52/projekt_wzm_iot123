@@ -162,7 +162,6 @@ class _DashboardM1GridState extends State<DashboardM1Grid>  {
     if (!mounted) return; // Check if widget is still mounted
     _direction = pt['direction'];
     _pwm_frequency = double.parse(pt['pwm_frequency'].toString());
-
     _speed = double.parse(pt['speed'].toString());
     _is_homing = pt['is_homing'];
     _is_testing = pt['is_testing'];

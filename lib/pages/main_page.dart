@@ -36,7 +36,6 @@ class MainPage extends Page{
     return MaterialPageRoute(
         settings: this, builder: (context)=>const MainWidget());
   }
-
 }
 
 class MainWidget extends StatefulWidget {
