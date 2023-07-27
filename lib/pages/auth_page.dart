@@ -38,7 +38,7 @@ class _AuthWidgetState extends State<AuthWidget> {
       context: context,
       barrierDismissible: false,
       builder: (BuildContext context) {
-        return Center(
+        return const Center(
           child: CircularProgressIndicator(),
         );
       },
@@ -91,8 +91,6 @@ class _AuthWidgetState extends State<AuthWidget> {
 
       }
 
-      //print('authUser: ${tbClient.getAuthUser()}');
-
       var currentUserDetails = await tbClient.getUserService().getUser();
       print('currentUserDetails: $currentUserDetails');
 
@@ -133,52 +131,6 @@ class _AuthWidgetState extends State<AuthWidget> {
 
     }
   }
-
-  // void login(String email, String password) async{
-  //   final storage = new FlutterSecureStorage();
-  //   var Body = {"username": email,
-  //     "password": password};
-  //   try{
-  //
-  //     Response response = await post(
-  //       //TODO: entsprechende url eingeben
-  //       Uri.parse('http://172.19.48.1:8080/api/auth/login'),
-  //       body: json.encode(Body)
-  //         );
-  //         var jsonData = null;
-  //           SharedPreferences sharedPreferences = await SharedPreferences.getInstance();
-  //
-  //         if(response.statusCode == 200){
-  //           jsonData = json.decode(response.body);
-  //           String token = jsonData['token'];
-  //           var val = jsonEncode('$token');
-  //
-  //           final userData = json.encode({
-  //             'token': token,
-  //             'user': email
-  //           });
-  //           // sharedPreferences.setString('userData', userData);
-  //             setState(() {
-  //               sharedPreferences.setString("token", jsonData['token']);
-  //             });
-  //           await storage.write(key: "token", value: jsonData['token']);
-  //
-  //           print(jsonData['token']);
-  //           print('Erfolgreich eingeloggt!');
-  //           Provider.of<PageNotifier>(context, listen: false).goToMain();
-  //
-  //
-  //         }else{
-  //           print(response.body);
-  //
-  //           //Provider.of<PageNotifier>(context, listen: false).goToMain();
-  //
-  //         }
-  //       }catch(e){
-  //         print(e.toString());
-  //       }
-  //
-  // }
 
   @override
   Widget build(BuildContext context) {
@@ -227,7 +179,7 @@ class _AuthWidgetState extends State<AuthWidget> {
                         //   backgroundColor: MaterialStateProperty.all(Colors.white70),
                         //
                         // ),
-                        child: Text('Passwort vergessen?',
+                        child: const Text('Passwort vergessen?',
                           style: TextStyle(
                               fontSize: 18,
                               //fontWeight: FontWeight.w600,
@@ -239,7 +191,7 @@ class _AuthWidgetState extends State<AuthWidget> {
                         },
                       ),
                     ),
-                    SizedBox(height: 10,),
+                    const SizedBox(height: 10,),
 
                     SizedBox(
                       height: 48,
@@ -271,16 +223,11 @@ class _AuthWidgetState extends State<AuthWidget> {
                           backgroundColor: MaterialStateProperty.all(Color.fromRGBO(23, 156, 125, 1)),
 
                         ),
-
-                        child: Text("Einloggen", style: TextStyle(
+                        child: const Text("Einloggen", style: TextStyle(
                             fontSize: 18,
                             color: Colors.black),
-
                         ), ),
                     ),
-
-
-
 
                   ],
                 ),

@@ -44,7 +44,6 @@ class _FAQWidgetState extends State<FAQWidget> {
               elevation: 0.0,
               actions: <Widget>[
 
-
               ],
 
 

@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:projekt_wzm_iot/provider/page_notifier.dart';
 import 'package:projekt_wzm_iot/widgets/dashboard_grid_M1.dart';
 import 'package:provider/provider.dart';
-import 'package:projekt_wzm_iot/pages/main_page.dart';
 
 
 

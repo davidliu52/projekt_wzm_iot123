@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:projekt_wzm_iot/provider/page_notifier.dart';
 import 'package:projekt_wzm_iot/widgets/dashboard_grid_S1.dart';
 import 'package:provider/provider.dart';
-import 'package:projekt_wzm_iot/pages/main_page.dart';
 
 
 class DashboardS1Page extends Page{
@@ -41,80 +40,17 @@ class _DashboardS1WidgetState extends State<DashboardS1Widget> {
               actions: <Widget>[
                 Row(
                   children: [
-          //           IconButton(icon: Icon(Icons.logout), onPressed: (){
-          //   print('logout button is clicked');
-          //   Provider.of<PageNotifier>(context, listen: false).goToAuth();
-          //
-          // }
-          // ),
+
                     IconButton(icon: Icon(Icons.home), onPressed: (){
                       print('home button wurde gedrückt');
                       Provider.of<PageNotifier>(context, listen: false).goToMain();
-
                     }
                     ),
                   ],
                 ),
-
               ],
-
-
-
             ),
-            // drawer: Drawer(
-            //   child: ListView(
-            //     padding: EdgeInsets.zero,
-            //     children: <Widget>[
-            //       UserAccountsDrawerHeader(
-            //         // currentAccountPicture: CircleAvatar(
-            //         //   backgroundImage: AssetImage('assets/person_icon.png'),
-            //         //   backgroundColor: Colors.white,
-            //         //
-            //         // ),
-            //         accountName: Text(UserName),
-            //         accountEmail: Text(UserEmail),
-            //         // onDetailsPressed: (){
-            //         //   print('arrow wurde gedrückt');
-            //         // },
-            //         decoration: BoxDecoration(
-            //             color: Color.fromRGBO(23, 156, 125, 1),
-            //             borderRadius: BorderRadius.only(
-            //               bottomLeft: Radius.circular(8.0),
-            //               bottomRight: Radius.circular(8.0),
-            //             )
-            //         ),
-            //       ),
 
-                  //
-                  // ListTile(
-                  //   leading: Icon(Icons.home),
-                  //   title: Text('Main'),
-                  //   onTap: (){
-                  //     print('Main wurde gedrückt');
-                  //     Provider.of<PageNotifier>(context, listen: false).goToMain();
-                  //
-                  //   },
-                  // ),
-                  //
-                  // ListTile(
-                  //   leading: Icon(Icons.settings),
-                  //   title: Text('Einstellung'),
-                  //   onTap: (){
-                  //     print('setting wurde gedrückt');
-                  //     Provider.of<PageNotifier>(context, listen: false).goToSetting();
-                  //   },
-                  // ),
-                  // ListTile(
-                  //   leading: Icon(Icons.question_answer),
-                  //   title: Text('Q&A'),
-                  //   onTap: (){
-                  //     print('Q&A wurde gedrückt');
-                  //     Provider.of<PageNotifier>(context, listen: false).goToFAQ();
-                  //   },
-                  // ),
-            //     ],
-            //   ),
-            // ),
 
             body: CustomScrollView(
               physics: ClampingScrollPhysics(),
@@ -134,41 +70,14 @@ class _DashboardS1WidgetState extends State<DashboardS1Widget> {
                 ),
               ),
 
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                const SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: 10.0),
                   sliver: SliverToBoxAdapter(
                     child: DashboardS1Grid(),
                   ),
                 ),
-
-
-
               ],
             )
-
-
-            // SafeArea(
-            //     child: Form(
-            //       child: ListView( // Listview erstellen
-            //         reverse: false,
-            //         // Alle Komponenten von unten anzeigen
-            //         // ListView Ende einstellen. fromLRTB (von links, rechts, oben und unten) MediaQuery.of(context).size.width: Displaygröße
-            //         padding: EdgeInsets.fromLTRB((MediaQuery.of(context).size.width - 320)/2, 30, (MediaQuery.of(context).size.width - 320)/2, 30),
-            //         children: [
-            //           SizedBox(height: 16,),
-            //           //   Leere Kiste hinzufügen (für die Positionierung)
-            //
-            //           Text('Hier ist Dashboard Page'),
-            //
-            //
-            //
-            //
-            //         ],
-            //       ),
-            //     ),
-            //
-            // ),
-
           ),
         ),
       ),

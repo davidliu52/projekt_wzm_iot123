@@ -6,7 +6,6 @@ import 'package:thingsboard_client/thingsboard_client.dart';
 import 'package:webviewx/webviewx.dart';
 import 'dart:io' show Platform;
 import 'package:flutter/foundation.dart';
-import 'package:shrink_sidemenu/shrink_sidemenu.dart';
 
 
 
@@ -54,13 +53,13 @@ class _MainWidgetState extends State<MainWidget> {
   double progress = 0;
   var urlController = TextEditingController();
 
-/*
+
   @override
   void initState() {
     print('Running on ${getPlatform()}');
     super.initState();
   }
-*/
+
 
  // bool isAuthenticated = false;
   //String authUser = '';
@@ -93,18 +92,17 @@ class _MainWidgetState extends State<MainWidget> {
     });
   }
 
+  // function to detect the platform
   String getPlatform() {
     if (kIsWeb) {
       setState(() {
         isWebapplication = false;
       });
-
       return 'web';
     } else if (Platform.isAndroid) {
       setState(() {
         isWebapplication = true;
       });
-
       return 'android';
     } else if (Platform.isIOS) {
       setState(() {
@@ -129,8 +127,6 @@ class _MainWidgetState extends State<MainWidget> {
          backgroundColor: _FraunhoferColor,
          elevation: 0.0,
          actions: <Widget>[
-
-
            isWebapplication? TextButton(
             onPressed: (){
               Provider.of<PageNotifier>(context, listen: false).goToAR();
@@ -154,7 +150,6 @@ class _MainWidgetState extends State<MainWidget> {
             ),
           ) :Container(),
            isAuthenticated?IconButton(icon: const Icon(Icons.logout), onPressed: (){
-          //  openDialog();
 
             print('logout button wurde gedrückt');
             showDialog(context: context, builder: (context) =>
@@ -180,9 +175,6 @@ class _MainWidgetState extends State<MainWidget> {
                 )
             );
 
-            // setState(() {
-            //   logout();
-            // });
           }
           ):IconButton(icon: const Icon(Icons.login), onPressed: (){
             print('login button wurde gedrückt');
@@ -277,10 +269,8 @@ class _MainWidgetState extends State<MainWidget> {
         body: SafeArea(
         child: Column(
           children: [
-
             Expanded(
                 child: Container(
-
                   child: LayoutBuilder(
                     builder: (BuildContext context, BoxConstraints constraints) {
                       return WebViewX(
@@ -293,315 +283,12 @@ class _MainWidgetState extends State<MainWidget> {
                     }
                   ),
                 )
-                  ),
-            ],
+            ),
+          ],
          )
        ),
-    ),
-
-/*
-      menu: SingleChildScrollView(
-        padding: EdgeInsets.zero,
-        child: Column(
-          children: [
-
-
-
-
-            Column(
-              children: [
-                UserAccountsDrawerHeader(
-                  accountName: isAuthenticated?Text(UserName):const Text(''),
-                  accountEmail: isAuthenticated?Text(UserEmail):const Text(''),
-                  onDetailsPressed: null,
-                  currentAccountPicture: Image.asset('assets/fraunhofer_image.png'),
-                  currentAccountPictureSize: isAuthenticated?const Size.square(70.0):const Size.square(100.0),
-                  decoration: BoxDecoration(
-
-                      color: _FraunhoferColor,
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(8.0),
-                        bottomRight: Radius.circular(8.0),
-                      )
-                  ),
-                ),
-                isAuthenticated?Container(
-                  color: Colors.white,
-
-                  child: ExpansionTile(
-                    leading: Icon(Icons.dashboard, color: _FraunhoferColor),
-                    title: const Text('Dashboard'),
-                    backgroundColor: Colors.white54,
-                    children: <Widget>[
-                      ListTile(
-                        title: const Text('Motor 1'),
-                        onTap: () {
-                          print('Dashboard-Motor 1 wurde gedrückt.');
-                          Provider.of<PageNotifier>(context, listen: false).goToDashboardM1();
-                        },
-                      ),
-                      ListTile(
-                        title: const Text('Motor 2'),
-                        onTap: () {
-                          print('Dashboard-Motor 2 wurde gedrückt.');
-                          Provider.of<PageNotifier>(context, listen: false).goToDashboardM2();
-                        },
-                      ),
-                      ListTile(
-                        title: const Text('Sensor 1'),
-                        onTap: () {
-                          print('Dashboard-Sensor 1 wurde gedrückt.');
-                          Provider.of<PageNotifier>(context, listen: false).goToDashboardS1();
-                        },
-                      ),
-                      ListTile(
-                        title: const Text('Sensor 2'),
-                        onTap: () {
-                          print('Dashboard-Sensor 2 wurde gedrückt.');
-                          Provider.of<PageNotifier>(context, listen: false).goToDashboardS2();
-                        },
-                      ),
-                    ],
-                  ),
-                ) : const Center(),
-
-                Container(
-                  height: 1000,
-                  padding: EdgeInsets.zero,
-                  color: Colors.white,
-                  child: Column(
-                    children: [
-
-                      ListTile(
-                        leading: Icon(Icons.settings, color: _FraunhoferColor),
-                        title: const Text('Einstellung'),
-                        onTap: (){
-                          print('Einstellung wurde gedrückt');
-                          Provider.of<PageNotifier>(context, listen: false).goToSetting();
-                        },
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.question_answer, color: _FraunhoferColor),
-                        title: const Text('FAQ'),
-                        onTap: (){
-                          print('FAQ wurde gedrückt');
-                          Provider.of<PageNotifier>(context, listen: false).goToFAQ();
-                        },
-                      ),
-                      ListTile(
-                        leading: Icon(Icons.logout, color: _FraunhoferColor),
-                        title: const Text('Logout'),
-                        onTap: () {
-                          showDialog(
-                            context: context,
-                            builder: (context) => AlertDialog(
-                              title: Text('Question'),
-                              content: Text('Are you sure you want to logout?'),
-                              actions: [
-                                TextButton(
-                                    onPressed: () {
-                                      Navigator.of(context).pop();
-                                      logout();
-                                    },
-                                    child: Text('Cancel')),
-                                TextButton(
-                                  onPressed: () {
-                                    Navigator.of(context).pop(); // Close the dialog
-                                    // Call the logout function here.
-                                  },
-                                  child: Text('Logout'),
-                                )
-                              ],
-                            ),
-                          );
-                        },
-                      ),
-                    ],
-                  ),
-                ),
-
-              ],
-            )
-          ],
-        ),
       ),
 
-*/
-
-
-
-
-/*
-
-      child:Scaffold(
-        backgroundColor: Colors.transparent,
-
-        appBar: AppBar(
-          title: const Text('Fraunhofer IoT System'),
-          centerTitle: true,
-          backgroundColor: _FraunhoferColor,
-          elevation: 0.0,
-          leading: IconButton(
-             icon: Icon(Icons.menu),
-            onPressed: () {
-               final _state = stateMenu.currentState;
-               _state?.openSideMenu();
-
-            },
-          ),
-          actions: <Widget>[
-            isAuthenticated?IconButton(icon: const Icon(Icons.logout), onPressed: (){
-
-              print('logout button wurde gedrückt');
-
-              showDialog(context: context, builder: (context) =>
-                  AlertDialog(
-                    title: Text('Question'),
-                    content: Text('Are you sure you want to logout?'),
-                    actions: [
-                      TextButton(
-                          onPressed: () {
-                            Navigator.of(context).pop();
-                          },
-                          child: Text('Cancel')
-                      ),
-                      //logout button
-                      TextButton(
-                      onPressed: () {
-                           Navigator.of(context).pop(); // Close the dialog
-                           logout(); // Call the logout function
-                             },
-                           child: Text('Logout'),
-                      )
-                    ],
-                  )
-              );
-
-              // setState(() {
-              //   logout();
-              // });
-            }
-            ):IconButton(icon: const Icon(Icons.login), onPressed: (){
-
-
-
-              print('login button wurde gedrückt');
-
-              // setState(() {
-              //   logout();
-              // });
-              Provider.of<PageNotifier>(context, listen: false).goToAuth();
-
-            }
-            ),
-          ],
-        ),
-
-
-        body: SafeArea(
-            child: Form(
-              child:   Column(
-                children: [
-                  Expanded(
-                    // height: 200, // specify height
-                    // width: double.infinity,
-                      child:  WebView( controller: webViewController,)
-                    //Image.network('https://images.unsplash.com/photo-1483232539664-d89822fb5d3e?ixlib=rb-4.0.3&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D&auto=format&fit=crop&w=764&q=80'),
-                    //InAppWebView(initialUrlRequest: URLRequest(url: Uri.parse(initialUrl)))
-                    //  initialUrlRequest: URLRequest(url: Uri.parse(initialUrl)),
-                  ),
-
-                ],
-              ),
-            )
-        ),
-
-
-
-
-
-
-/*
-        drawer: SafeArea(
-          child: Drawer(
-            child: ListView(
-              padding: EdgeInsets.zero,
-                children: <Widget>[
-
-                  UserAccountsDrawerHeader(
-                    accountName: isAuthenticated?Text(UserName):const Text(''),
-                    accountEmail: isAuthenticated?Text(UserEmail):const Text(''),
-                    onDetailsPressed: null,
-                    currentAccountPicture: Image.asset('assets/fraunhofer_image.png'),
-                    currentAccountPictureSize: isAuthenticated?const Size.square(70.0):const Size.square(100.0),
-                    decoration: BoxDecoration(
-                      color: _FraunhoferColor,
-                      borderRadius: const BorderRadius.only(
-                        bottomLeft: Radius.circular(8.0),
-                        bottomRight: Radius.circular(8.0),
-                      )
-                    ),
-                  ),
-                  isAuthenticated?ExpansionTile(
-                    leading: Icon(Icons.dashboard, color: _FraunhoferColor),
-                    title: const Text('Dashboard'),
-                    backgroundColor: Colors.white54,
-                    children: <Widget>[
-                      ListTile(
-                        title: const Text('Motor 1'),
-                        onTap: () {
-                          print('Dashboard-Motor 1 wurde gedrückt.');
-                          Provider.of<PageNotifier>(context, listen: false).goToDashboardM1();
-                        },
-                      ),
-                      ListTile(
-                        title: const Text('Motor 2'),
-                        onTap: () {
-                          print('Dashboard-Motor 2 wurde gedrückt.');
-                          Provider.of<PageNotifier>(context, listen: false).goToDashboardM2();
-                        },
-                      ),
-                      ListTile(
-                        title: const Text('Sensor 1'),
-                        onTap: () {
-                          print('Dashboard-Sensor 1 wurde gedrückt.');
-                          Provider.of<PageNotifier>(context, listen: false).goToDashboardS1();
-                        },
-                      ),
-                      ListTile(
-                        title: const Text('Sensor 2'),
-                        onTap: () {
-                          print('Dashboard-Sensor 2 wurde gedrückt.');
-                          Provider.of<PageNotifier>(context, listen: false).goToDashboardS2();
-                        },
-                      ),
-                    ],
-                  ) : const Center(),
-                  ListTile(
-                    leading: Icon(Icons.settings, color: _FraunhoferColor),
-                    title: const Text('Einstellung'),
-                    onTap: (){
-                      print('Einstellung wurde gedrückt');
-                      Provider.of<PageNotifier>(context, listen: false).goToSetting();
-                    },
-                  ),
-                  ListTile(
-                    leading: Icon(Icons.question_answer, color: _FraunhoferColor),
-                    title: const Text('FAQ'),
-                    onTap: (){
-                      print('FAQ wurde gedrückt');
-                      Provider.of<PageNotifier>(context, listen: false).goToFAQ();
-                    },
-                  ),
-                ],
-            ),
-          ),
-        ),
-
-*/
-
-      ),
-      */
       );
   }
 

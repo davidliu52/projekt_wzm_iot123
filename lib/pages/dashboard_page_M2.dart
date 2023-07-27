@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:projekt_wzm_iot/provider/page_notifier.dart';
 import 'package:provider/provider.dart';
 import 'package:projekt_wzm_iot/widgets/dashboard_grid_M2.dart';
-import 'package:projekt_wzm_iot/pages/main_page.dart';
 
 
 class DashboardM2Page extends Page{
@@ -43,12 +42,7 @@ class _DashboardM2WidgetState extends State<DashboardM2Widget> {
               actions: <Widget>[
                 Row(
                   children: [
-          //           IconButton(icon: Icon(Icons.logout), onPressed: (){
-          //   print('logout button is clicked');
-          //   Provider.of<PageNotifier>(context, listen: false).goToAuth();
-          //
-          // }
-          // ),
+
                     IconButton(icon: Icon(Icons.home), onPressed: (){
                       print('home button wurde gedrückt');
                       Provider.of<PageNotifier>(context, listen: false).goToMain();
@@ -63,71 +57,17 @@ class _DashboardM2WidgetState extends State<DashboardM2Widget> {
 
 
             ),
-            // drawer: Drawer(
-            //   child: ListView(
-            //     padding: EdgeInsets.zero,
-            //     children: <Widget>[
-            //       UserAccountsDrawerHeader(
-            //         // currentAccountPicture: CircleAvatar(
-            //         //   backgroundImage: AssetImage('assets/person_icon.png'),
-            //         //   backgroundColor: Colors.white,
-            //         //
-            //         // ),
-            //         accountName: Text(UserName),
-            //         accountEmail: Text(UserEmail),
-            //         // onDetailsPressed: (){
-            //         //   print('arrow wurde gedrückt');
-            //         // },
-            //         decoration: BoxDecoration(
-            //             color: Color.fromRGBO(23, 156, 125, 1),
-            //             borderRadius: BorderRadius.only(
-            //               bottomLeft: Radius.circular(8.0),
-            //               bottomRight: Radius.circular(8.0),
-            //             )
-            //         ),
-            //       ),
-
-                  //
-                  // ListTile(
-                  //   leading: Icon(Icons.home),
-                  //   title: Text('Main'),
-                  //   onTap: (){
-                  //     print('Main wurde gedrückt');
-                  //     Provider.of<PageNotifier>(context, listen: false).goToMain();
-                  //
-                  //   },
-                  // ),
-                  //
-                  // ListTile(
-                  //   leading: Icon(Icons.settings),
-                  //   title: Text('Einstellung'),
-                  //   onTap: (){
-                  //     print('setting wurde gedrückt');
-                  //     Provider.of<PageNotifier>(context, listen: false).goToSetting();
-                  //   },
-                  // ),
-                  // ListTile(
-                  //   leading: Icon(Icons.question_answer),
-                  //   title: Text('Q&A'),
-                  //   onTap: (){
-                  //     print('Q&A wurde gedrückt');
-                  //     Provider.of<PageNotifier>(context, listen: false).goToFAQ();
-                  //   },
-                  // ),
-            //     ],
-            //   ),
-            // ),
 
             body: CustomScrollView(
-              physics: ClampingScrollPhysics(),
+              physics: const ClampingScrollPhysics(),
               slivers: <Widget>[
                 _buildHeader(),
-              SliverPadding(
-                padding: const EdgeInsets.all(20.0),
+              const SliverPadding(
+                padding: EdgeInsets.all(20.0),
                 sliver: SliverToBoxAdapter(
                   child: Text(
                     'Motor 2 Daten',
-                    style: const TextStyle(
+                    style: TextStyle(
                       color: Colors.black,
                       fontSize: 20.0,
                       fontWeight: FontWeight.bold,
@@ -136,8 +76,8 @@ class _DashboardM2WidgetState extends State<DashboardM2Widget> {
                 ),
               ),
 
-                SliverPadding(
-                  padding: const EdgeInsets.symmetric(horizontal: 10.0),
+                const SliverPadding(
+                  padding: EdgeInsets.symmetric(horizontal: 10.0),
                   sliver: SliverToBoxAdapter(
                     child: DashboardM2Grid(),
                   ),
@@ -149,28 +89,6 @@ class _DashboardM2WidgetState extends State<DashboardM2Widget> {
             )
 
 
-            // SafeArea(
-            //     child: Form(
-            //       child: ListView( // Listview erstellen
-            //         reverse: false,
-            //         // Alle Komponenten von unten anzeigen
-            //         // ListView Ende einstellen. fromLRTB (von links, rechts, oben und unten) MediaQuery.of(context).size.width: Displaygröße
-            //         padding: EdgeInsets.fromLTRB((MediaQuery.of(context).size.width - 320)/2, 30, (MediaQuery.of(context).size.width - 320)/2, 30),
-            //         children: [
-            //           SizedBox(height: 16,),
-            //           //   Leere Kiste hinzufügen (für die Positionierung)
-            //
-            //           Text('Hier ist Dashboard Page'),
-            //
-            //
-            //
-            //
-            //         ],
-            //       ),
-            //     ),
-            //
-            // ),
-
           ),
         ),
       ),
@@ -180,13 +98,13 @@ class _DashboardM2WidgetState extends State<DashboardM2Widget> {
 }
 
 SliverPadding _buildHeader() {
-  return SliverPadding(
+  return const SliverPadding(
 
-    padding: const EdgeInsets.all(20.0),
+    padding: EdgeInsets.all(20.0),
     sliver: SliverToBoxAdapter(
       child: Text(
         'Dashboard Motor 2',
-        style: const TextStyle(
+        style: TextStyle(
           color: Color.fromRGBO(23, 156, 125, 1),
           fontSize: 25.0,
           fontWeight: FontWeight.bold,
