@@ -54,7 +54,7 @@ class _DashboardS2VRGridState extends State<DashboardS2VRGrid> {
   _DashboardS2VRGridState() {
 
 
-    _dataReadTimer = Timer.periodic(const Duration(milliseconds: 3000), (_timer) {
+    _dataReadTimer = Timer.periodic(const Duration(milliseconds: 1000), (_timer) {
       dateneinlesen2();
     });
 

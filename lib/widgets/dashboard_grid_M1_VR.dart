@@ -28,7 +28,7 @@ class _DashboardM1VRGridState extends State<DashboardM1VRGrid>  {
   void initState() {  // This function will initialize the function. It is called only once
     connectAndSubscribe();// This is a custom function that be used to connect MQTT broker.
     chartData = getChartData();
-    _updateTimer= Timer.periodic(const Duration(seconds: 3), updateDataSource);
+    _updateTimer= Timer.periodic(const Duration(seconds: 1), updateDataSource);
     super.initState();
 
   }
