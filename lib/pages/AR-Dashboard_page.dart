@@ -36,24 +36,20 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
   final cameras = <CameraDescription>[];
   final stopwatch = Stopwatch();
   final _qrCode = QrCode();
-  String _numberofequipment = '';
   bool _processFrameReady = true;
   List<Matrix4> matrices = []; // To store collected matrices
   int chartnummer = 0;
   bool showcountvalue = false;
 
-  void updateGlobalInfo(String value) {
-    setState(() {
-      _numberofequipment = value;
-    });
-  }
 
+// this function enable the display of chart over the QR-code upon button press
   void chartinfo (int value) {
     setState(() {
       chartnummer = value;
     });
   }
 
+  // This function implements a 3-second countdown when the button is pressed.
   void showcount(int i) {
     setState(() {
       showcountvalue = true;
@@ -70,6 +66,7 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
     ]);
   }
 
+  // function to initialize the control of camera and start to capture image
   Future<void> _initializeCamera() async {
     cameras.addAll(await availableCameras());
     // You can now access the cameras list and initialize your camera controller
@@ -98,14 +95,13 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
       ),
       body: ListView(
         children: [
-          _buildPreview(_numberofequipment, chartnummer),
+          _buildPreview(chartnummer),
           const ListTile(
             title:
             Center(child: Text("please place the QR code in the center of the screen and select your device", style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold))),
           ),
           const SizedBox( height: 20),
-          showcountvalue?const Countdown():Container(),
-
+          showcountvalue?const Countdown():Container(),// if the value of showcountvalue is 1, it will start countdown
         Container(
             padding: const EdgeInsets.all(8),
             child: Row(
@@ -117,10 +113,9 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
                     padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration( borderRadius: BorderRadius.circular(15.0), color: _FraunhoferColor),
                     alignment: Alignment.center,
-                    child: TextButton(// You can use other alignments like Alignment.topLeft, Alignment.bottomRight, etc.
+                    child: TextButton(//the begin of the control to display the things in the form augmented reality
                       onPressed: () {
                         showcount(1);
-                        updateGlobalInfo('Motor 1');
                         chartinfo(1);
                       },
                       child: const Text(' Motor 1',
@@ -141,8 +136,6 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
                     child: TextButton(// You can use other alignments like Alignment.topLeft, Alignment.bottomRight, etc.
                       onPressed: () {
                         showcount(1);
-
-                        updateGlobalInfo('Motor 2');
                         chartinfo(2);
                       },
                       child: const Text(' Motor 2',
@@ -163,8 +156,6 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
                     child: TextButton(// You can use other alignments like Alignment.topLeft, Alignment.bottomRight, etc.
                       onPressed: () {
                         showcount(1);
-
-                        updateGlobalInfo('sensor 1');
                         chartinfo(3);
                       },
                       child: const Text(' Sensor 1',
@@ -185,7 +176,6 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
                     child: TextButton(// You can use other alignments like Alignment.topLeft, Alignment.bottomRight, etc.
                       onPressed: () {
                         showcount(1);
-                        updateGlobalInfo('sensor 2');
                         chartinfo(4);
                       },
                       child: const Text(' Sensor 2',
@@ -205,17 +195,21 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
     );
   }
 
-
-  Widget _buildPreview(String numberOfEquipment, int chartnumber) {
+// This function builds the widget that displays the camera feed and overlays it with
+// information about the QR codes that are currently being scanned.
+  Widget _buildPreview( int chartnumber) {
+    // A StreamBuilder widget is used to create a dynamic widget that updates whenever
+    // a new _ScannedFrame is added to the _scannedFrameStreamController stream.
     return StreamBuilder<_ScannedFrame>(
       stream: _scannedFrameStreamController.stream,
       initialData: null,
       builder: (context, snapshot) => snapshot.data != null
+      // If the snapshot contains data, build the camera feed view
           ? LayoutBuilder(
              builder: (context, constraints) => ClipRect(
                clipBehavior: Clip.hardEdge,
                child: _buildFrame(
-              snapshot.data!, constraints.maxWidth, constraints.maxWidth,numberOfEquipment, chartnumber),
+              snapshot.data!, constraints.maxWidth, constraints.maxWidth, chartnumber),
         ),
       )
           : const Center(
@@ -225,7 +219,7 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
   }
 
 
-  Widget _buildFrame(_ScannedFrame frame, double width, double height,numberOfEquipment, chartnumber) {
+  Widget _buildFrame(_ScannedFrame frame, double width, double height, chartnumber) {
     final scaleFactor = width / frame.image.width.toDouble();
     return Stack(
       alignment: Alignment.topLeft,
@@ -233,7 +227,6 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
         CustomPaint(
           painter: _CameraViewPainter( frame: frame),
           size: ui.Size(width, height)),
-
         Align(
           alignment: Alignment.topCenter,
           child: Padding(
@@ -250,7 +243,7 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
             ),
           ),
         ),
-
+        // If a QR code is detected in the frame, overlay an image on top of it
         (frame.qrCode != null)
             ? _buildImageOverlay(frame.qrCode!, scaleFactor,chartnumber)
             : Container(),
@@ -261,10 +254,12 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
 
 
   Matrix4? initialScaledTransformationMatrix;
+// This widget builds an overlay for the detected QR code
 
   Widget _buildImageOverlay(QrCode qrCode, double scaleFactor, chartnumber) {
-
+    // Generate a transformation matrix from the QR code location
     final transformMatrix = qrCode.location?.computePerspectiveTransform().to3DPerspectiveMatrix();
+    // Scale the transformation matrix according to the scaleFactor
     final scaledTransformationMatrix = transformMatrix != null
         ? Matrix4.diagonal3Values(scaleFactor, scaleFactor, scaleFactor) *
         Matrix4.fromFloat64List(transformMatrix)
@@ -272,8 +267,11 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
 
     final qrCodeSize = qrCode.location?.dimension.size.toDouble();
     final content = qrCode.content?.text;
+
+    // If the QR code is of the correct size, its content is not null, and it corresponds to one of the required chart numbers...
     if (qrCodeSize != null && content != null && (chartnumber == 1 || chartnumber == 2 || chartnumber == 3 || chartnumber == 4) ) {
-      stopwatch.start();
+      stopwatch.start();    // Start the stopwatch to track time
+      // If the transformation matrix is scaled and the stopwatch has not passed 3 seconds, set the initial transformation matrix
       if (scaledTransformationMatrix != null && stopwatch.elapsedMilliseconds <= 3000) {
         initialScaledTransformationMatrix= scaledTransformationMatrix;
         }
@@ -287,7 +285,7 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
              height: qrCodeSize*10,
              width: qrCodeSize*5,
              child: (){
-               switch (chartnumber) {
+               switch (chartnumber) {// The display of the chart will depend on the 'chartNumber', which is determined by the button selection.
                case 1: return DashboardM1VRGrid();
                  case 2: return DashboardM2VRGrid();
                  case 3: return DashboardS1VRGrid();
@@ -316,7 +314,6 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
       return;
     }
     _processFrameReady = false;
-
     try {
       int imageWidth = cameraFrame.width;
       int imageHeight = cameraFrame.height;
@@ -348,6 +345,7 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
 
       }
 
+      // Function responsible for converting from YUV to RGB format
       Uint8List yuv420ToRgba8888(List<Uint8List> planes, int width, int height) {
         final yPlane = planes[0];
         final uPlane = planes[1];
@@ -407,7 +405,6 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
       int rotatedWidth = rotatedImage.width;
       int rotatedHeight = rotatedImage.height;
       //-------------------
-      //   var image = await createImage(data, imageWidth, imageHeight, ui.PixelFormat.rgba8888);
       var image = await createImage(rotatedData, rotatedWidth, rotatedHeight, ui.PixelFormat.rgba8888);
 
       // Update the QR code by scanning the image cont  ent
@@ -456,7 +453,7 @@ class _ScannedFrame {
   });
 }
 
-
+// countdown function to realize the count 3 seconds
 class Countdown extends StatefulWidget {
   const Countdown({super.key});
 
