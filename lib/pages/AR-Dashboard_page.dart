@@ -23,25 +23,24 @@ class ARcode extends Page {
 }
 
 class AR_Dashboard_Page extends StatefulWidget {
-
   const AR_Dashboard_Page({Key? key}) : super(key: key);
-
   @override
   State<AR_Dashboard_Page> createState() => _AR_Dashboard_Page_State();
 }
 
 class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
+
   final Color _FraunhoferColor = const Color.fromRGBO(23, 156, 125, 1);
-  late CameraController _cameraController;
   final _scannedFrameStreamController = StreamController<_ScannedFrame>();
-  bool _processFrameReady = true;
-  List<Matrix4> matrices = []; // To store collected matrices
+  late CameraController _cameraController;
   final cameras = <CameraDescription>[];
   final stopwatch = Stopwatch();
-
-  // The scanned QR code
   final _qrCode = QrCode();
   String _numberofequipment = '';
+  bool _processFrameReady = true;
+  List<Matrix4> matrices = []; // To store collected matrices
+  int chartnummer = 0;
+  bool showcountvalue = false;
 
   void updateGlobalInfo(String value) {
     setState(() {
@@ -49,15 +48,12 @@ class _AR_Dashboard_Page_State extends State<AR_Dashboard_Page> {
     });
   }
 
-int chartnummer = 0;
-
   void chartinfo (int value) {
     setState(() {
       chartnummer = value;
     });
   }
 
-  bool showcountvalue = false;
   void showcount(int i) {
     setState(() {
       showcountvalue = true;
