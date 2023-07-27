@@ -64,4 +64,10 @@ class PageNotifier extends ChangeNotifier{
     _currentPage =ARcode.pageName;
     notifyListeners();
   }
+
+  void goToOtherPage(String name){
+    _currentPage = name;
+    notifyListeners();
+  }
+
 }

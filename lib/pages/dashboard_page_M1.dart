@@ -68,7 +68,6 @@ class _DashboardM1WidgetState extends State<DashboardM1Widget> {
                           fontWeight: FontWeight.bold,
                         ),
                       ),
-
                     ],
                   ),
                 ),
