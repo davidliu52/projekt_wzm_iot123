@@ -40,6 +40,7 @@ class MyApp extends StatelessWidget {
                   key: ValueKey(MainPage.pageName),
                   child: MainWidget()
                 ),
+
                 if(pageNotifier.currentPage == MainPage.pageName) MainPage(), // wenn pageName MainPage ist, wird MainPage ausgegeben.
                 if(pageNotifier.currentPage == AuthPage.pageName) AuthPage(), // wenn pageName AuthPage ist, wird AuthPage ausgegeben.
                 if(pageNotifier.currentPage == DashboardM1Page.pageName) DashboardM1Page(), // wenn pageName DashboardPage ist, wird DashboardPage ausgegeben.
